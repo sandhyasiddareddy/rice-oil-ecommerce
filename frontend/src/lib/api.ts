@@ -1,3 +1,5 @@
+import { guestOrderTokenKey, readGuestItem } from "./guest-storage";
+
 export type CatalogCategory = {
   id: number;
   name: string;
@@ -13,6 +15,7 @@ export type CatalogProduct = {
   description: string | null;
   startingPrice: number;
   currency: string;
+  imageUrl: string | null;
 };
 
 export type CatalogVariant = {
@@ -31,6 +34,7 @@ export type CatalogProductDetail = {
   slug: string;
   description: string | null;
   categorySlug: string;
+  imageUrl: string | null;
   variants: CatalogVariant[];
 };
 
@@ -100,12 +104,40 @@ export type Shipment = {
   events: ShipmentEvent[];
 };
 
+export type OrderItem = {
+  sku: string;
+  productName: string;
+  quantity: number;
+  unitPrice: number;
+  lineTotal: number;
+};
+
 export type GuestOrderTracking = {
   orderId: number;
   orderNumber: string;
   status: string;
+  currency: string;
+  totalAmount: number;
+  shippingAmount: number;
+  items: OrderItem[];
   shipments: Shipment[];
+  canRequestCancellation: boolean;
+  cancellationStatus: string | null;
+  refundStatus: string | null;
+  refundAmount: number | null;
 };
+
+export type AftercareRequest = {
+  id: number;
+  orderId: number;
+  amount: number | null;
+  status: string;
+  reason: string | null;
+  providerRefundId: string | null;
+  providerStatus: string | null;
+};
+
+export type CancellationRequestResult = Pick<AftercareRequest, "id" | "orderId" | "status" | "reason">;
 
 export type PaymentOrder = {
   orderId: number;
@@ -113,6 +145,7 @@ export type PaymentOrder = {
   currency: string;
   amount: number;
   status: string;
+  keyId: string;
 };
 
 export type VerifiedPayment = {
@@ -139,8 +172,42 @@ export type CustomerOrder = {
   status: string;
   currency: string;
   totalAmount: number;
+  shippingAmount: number;
+  items: OrderItem[];
+  shipments: Shipment[];
   customerEmail: string;
+  canRequestCancellation: boolean;
+  cancellationStatus: string | null;
+  refundStatus: string | null;
+  refundAmount: number | null;
 };
+
+export type CustomerAddress = {
+  id: number;
+  label: string;
+  fullName: string;
+  phone: string;
+  line1: string;
+  line2: string | null;
+  city: string;
+  state: string;
+  postalCode: string;
+  country: string;
+  defaultAddress: boolean;
+  shippingAddress: boolean;
+  billingAddress: boolean;
+};
+
+export type AddressInput = Omit<CustomerAddress, "id" | "defaultAddress" | "shippingAddress" | "billingAddress"> & {
+  defaultAddress?: boolean;
+  shippingAddress?: boolean;
+  billingAddress?: boolean;
+};
+
+export type CheckoutAddress = Pick<
+  CustomerAddress,
+  "fullName" | "phone" | "line1" | "line2" | "city" | "state" | "postalCode" | "country"
+>;
 
 export type AuthSession = {
   token: string;
@@ -163,7 +230,7 @@ function guestOrderHeaders(orderId: number): Record<string, string> {
     return {};
   }
   try {
-    const token = window.sessionStorage.getItem(`riceoil.guest-order.${orderId}`);
+    const token = readGuestItem(guestOrderTokenKey(orderId));
     return token ? { "X-Guest-Order-Token": token } : {};
   } catch {
     return {};
@@ -209,6 +276,14 @@ async function request<T>(
   return response.json() as Promise<T>;
 }
 
+function notifyCartUpdated(cart: Cart): Cart {
+  if (typeof window !== "undefined") {
+    const count = cart.items.reduce((total, item) => total + item.quantity, 0);
+    window.dispatchEvent(new CustomEvent("farmora:cart-updated", { detail: { count } }));
+  }
+  return cart;
+}
+
 function safeErrorMessage(path: string, status: number): string {
   if (path === "/api/auth/login" && (status === 400 || status === 401)) {
     return "Email or password is incorrect.";
@@ -248,6 +323,17 @@ export const storefrontApi = {
       method: "POST",
       body: JSON.stringify({ email, password })
     }),
+  logout: () => request<{ message: string }>("/api/auth/logout", { method: "POST" }),
+  requestPasswordReset: (email: string) =>
+    request<{ message: string }>("/api/auth/password-reset/request", {
+      method: "POST",
+      body: JSON.stringify({ email })
+    }),
+  resetPassword: (token: string, newPassword: string) =>
+    request<{ message: string }>("/api/auth/password-reset/complete", {
+      method: "POST",
+      body: JSON.stringify({ token, newPassword })
+    }),
   listCategories: () => request<CatalogCategory[]>("/api/catalog/categories"),
   listProducts: (category?: string) =>
     request<CatalogProduct[]>(
@@ -256,44 +342,55 @@ export const storefrontApi = {
   searchProducts: (query: string) =>
     request<CatalogProduct[]>(`/api/catalog/search?q=${encodeURIComponent(query)}`),
   getProduct: (slugOrSku: string) => request<CatalogProductDetail>(`/api/catalog/products/${slugOrSku}`),
-  createCart: () => request<Cart>("/api/carts", { method: "POST", body: JSON.stringify({ currency: "INR" }) }),
+  createCart: () => request<Cart>("/api/carts", { method: "POST", body: JSON.stringify({ currency: "INR" }) })
+    .then(notifyCartUpdated),
   getOrCreateMyCart: (guestCartId: number | null, guestCartToken: string | null = null) =>
     request<Cart>("/api/customers/me/cart", {
       method: "POST",
       body: JSON.stringify({ guestCartId })
-    }, guestCartToken),
+    }, guestCartToken).then(notifyCartUpdated),
   getCart: (cartId: number, guestCartToken: string | null = null) =>
-    request<Cart>(`/api/carts/${cartId}`, undefined, guestCartToken),
+    request<Cart>(`/api/carts/${cartId}`, undefined, guestCartToken).then(notifyCartUpdated),
   addItem: (
     cartId: number,
     input: { sku: string; productName: string; unitPrice: number; quantity: number },
     guestCartToken: string | null = null
   ) =>
-    request<Cart>(`/api/carts/${cartId}/items`, { method: "POST", body: JSON.stringify(input) }, guestCartToken),
+    request<Cart>(`/api/carts/${cartId}/items`, { method: "POST", body: JSON.stringify(input) }, guestCartToken)
+      .then(notifyCartUpdated),
   updateItem: (
     cartId: number,
     itemId: number,
     input: { unitPrice?: number; quantity?: number },
     guestCartToken: string | null = null
   ) =>
-    request<Cart>(`/api/carts/${cartId}/items/${itemId}`, { method: "PATCH", body: JSON.stringify(input) }, guestCartToken),
+    request<Cart>(`/api/carts/${cartId}/items/${itemId}`, { method: "PATCH", body: JSON.stringify(input) }, guestCartToken)
+      .then(notifyCartUpdated),
   removeItem: (cartId: number, itemId: number, guestCartToken: string | null = null) =>
-    request<Cart>(`/api/carts/${cartId}/items/${itemId}`, { method: "DELETE" }, guestCartToken),
+    request<Cart>(`/api/carts/${cartId}/items/${itemId}`, { method: "DELETE" }, guestCartToken)
+      .then(notifyCartUpdated),
   refreshPricing: (cartId: number, taxCode: string, couponCodes: string[], guestCartToken: string | null = null) =>
     request<Cart>(`/api/carts/${cartId}/pricing/refresh`, {
       method: "POST",
       body: JSON.stringify({ taxCode, couponCodes })
-    }, guestCartToken),
+    }, guestCartToken).then(notifyCartUpdated),
   quote: (subtotal: number, taxCode: string, couponCodes: string[], customerEmail: string) =>
     request<CheckoutQuote>("/api/checkout/quote", {
       method: "POST",
       body: JSON.stringify({ subtotal, taxCode, couponCodes, customerEmail })
     }),
-  placeOrder: (idempotencyKey: string, cartId: number, customerEmail: string, guestCartToken: string | null = null) =>
+  placeOrder: (
+    idempotencyKey: string,
+    cartId: number,
+    customerEmail: string,
+    shippingAddress: CheckoutAddress,
+    billingAddress: CheckoutAddress,
+    guestCartToken: string | null = null
+  ) =>
     request<Order>("/api/checkout/orders", {
       method: "POST",
       headers: { "Idempotency-Key": idempotencyKey },
-      body: JSON.stringify({ cartId, customerEmail })
+      body: JSON.stringify({ cartId, customerEmail, shippingAddress, billingAddress })
     }, guestCartToken),
   createPaymentOrder: (orderId: number) =>
     request<PaymentOrder>("/api/payments/razorpay/create-order", {
@@ -314,6 +411,31 @@ export const storefrontApi = {
     }, guestCartToken),
   listMyOrders: () => request<CustomerOrder[]>("/api/customers/me/orders"),
   getMyOrder: (orderId: number) => request<CustomerOrder>(`/api/customers/me/orders/${orderId}`),
+  requestCancellation: (orderId: number, reason: string | null, guestToken?: string) =>
+    request<CancellationRequestResult>(`/api/orders/${orderId}/cancellation-requests`, {
+      method: "POST",
+      ...(guestToken ? { headers: { "X-Guest-Order-Token": guestToken } } : {}),
+      body: JSON.stringify({ reason })
+    }),
+  requestRefund: (orderId: number, amount: number, reason: string | null, guestToken?: string) =>
+    request<AftercareRequest>(`/api/orders/${orderId}/refund-requests`, {
+      method: "POST",
+      ...(guestToken ? { headers: { "X-Guest-Order-Token": guestToken } } : {}),
+      body: JSON.stringify({ amount, reason })
+    }),
+  listMyAddresses: () => request<CustomerAddress[]>("/api/customers/addresses"),
+  createMyAddress: (input: AddressInput) =>
+    request<CustomerAddress>("/api/customers/addresses", {
+      method: "POST",
+      body: JSON.stringify(input)
+    }),
+  updateMyAddress: (addressId: number, input: AddressInput) =>
+    request<CustomerAddress>(`/api/customers/addresses/${addressId}`, {
+      method: "PUT",
+      body: JSON.stringify(input)
+    }),
+  deleteMyAddress: (addressId: number) =>
+    request<void>(`/api/customers/addresses/${addressId}`, { method: "DELETE" }),
   getGuestOrderTracking: (orderId: number, accessToken: string) =>
     request<GuestOrderTracking>(`/api/guest/orders/${orderId}/tracking`, {
       headers: { "X-Guest-Token": accessToken }

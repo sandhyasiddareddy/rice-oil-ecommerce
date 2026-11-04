@@ -7,6 +7,7 @@ import com.riceoil.platform.cart.domain.CartItemEntity;
 import com.riceoil.platform.cart.domain.CartItemRepository;
 import com.riceoil.platform.cart.domain.CartRepository;
 import com.riceoil.platform.cart.domain.CartStatus;
+import com.riceoil.platform.shared.observability.BusinessLog;
 import com.riceoil.platform.shared.web.ResourceNotFoundException;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
@@ -76,6 +77,7 @@ public class CartApplicationService {
     public CartSnapshot getCart(Long cartId, Long customerId, String guestAccessToken) {
         CartEntity cart = findCart(cartId, customerId, guestAccessToken);
         List<CartItemEntity> items = cartItemRepository.findByCartIdOrderByIdAsc(cartId);
+        updateCartTotals(cart, items, readCouponCodes(cart.getCouponCodesJson()));
         return toSnapshot(cart, items, readCouponCodes(cart.getCouponCodesJson()));
     }
 
@@ -99,17 +101,31 @@ public class CartApplicationService {
         }
 
         CartEntity cart = findCart(cartId, customerId, guestAccessToken);
-        CartItemEntity item = new CartItemEntity();
-        item.setCart(cart);
-        item.setSku(command.sku().trim().toUpperCase());
+        String sku = command.sku().trim().toUpperCase();
+        CartItemEntity item = cartItemRepository.findByCartIdOrderByIdAsc(cartId).stream()
+                .filter(existing -> sku.equals(existing.getSku()))
+                .findFirst()
+                .orElse(null);
+        int quantity = command.quantity();
+        if (item == null) {
+            item = new CartItemEntity();
+            item.setCart(cart);
+            item.setSku(sku);
+        } else {
+            quantity += item.getQuantity();
+        }
         item.setProductName(command.productName().trim());
         item.setUnitPrice(money(command.unitPrice()));
-        item.setQuantity(command.quantity());
-        item.setLineTotal(money(command.unitPrice().multiply(BigDecimal.valueOf(command.quantity()))));
+        item.setQuantity(quantity);
+        item.setLineTotal(money(command.unitPrice().multiply(BigDecimal.valueOf(quantity))));
 
         cartItemRepository.save(item);
+        BusinessLog.info("CART_ITEM_ADDED", "cartId", cartId, "sku", item.getSku(), "quantity", item.getQuantity(),
+                "unitPrice", item.getUnitPrice(), "lineTotal", item.getLineTotal());
         List<CartItemEntity> items = cartItemRepository.findByCartIdOrderByIdAsc(cartId);
-        return toSnapshot(cart, items, readCouponCodes(cart.getCouponCodesJson()));
+        List<String> couponCodes = readCouponCodes(cart.getCouponCodesJson());
+        updateCartTotals(cart, items, couponCodes);
+        return toSnapshot(cart, items, couponCodes);
     }
 
     @Transactional
@@ -139,13 +155,19 @@ public class CartApplicationService {
             throw new IllegalArgumentException("unitPrice must be zero or greater");
         }
 
+        int previousQuantity = item.getQuantity();
         item.setUnitPrice(money(unitPrice));
         item.setQuantity(quantity);
         item.setLineTotal(money(unitPrice.multiply(BigDecimal.valueOf(quantity))));
         cartItemRepository.save(item);
+        BusinessLog.info("CART_ITEM_UPDATED", "cartId", cartId, "sku", item.getSku(),
+                "previousQuantity", previousQuantity, "quantity", quantity,
+                "unitPrice", item.getUnitPrice(), "lineTotal", item.getLineTotal());
 
         List<CartItemEntity> items = cartItemRepository.findByCartIdOrderByIdAsc(cartId);
-        return toSnapshot(cart, items, readCouponCodes(cart.getCouponCodesJson()));
+        List<String> couponCodes = readCouponCodes(cart.getCouponCodesJson());
+        updateCartTotals(cart, items, couponCodes);
+        return toSnapshot(cart, items, couponCodes);
     }
 
     @Transactional
@@ -165,8 +187,11 @@ public class CartApplicationService {
                 .orElseThrow(() -> new ResourceNotFoundException("Cart item not found: " + itemId));
 
         cartItemRepository.delete(item);
+        BusinessLog.info("CART_ITEM_REMOVED", "cartId", cartId, "sku", item.getSku(), "quantity", item.getQuantity());
         List<CartItemEntity> items = cartItemRepository.findByCartIdOrderByIdAsc(cartId);
-        return toSnapshot(cart, items, readCouponCodes(cart.getCouponCodesJson()));
+        List<String> couponCodes = readCouponCodes(cart.getCouponCodesJson());
+        updateCartTotals(cart, items, couponCodes);
+        return toSnapshot(cart, items, couponCodes);
     }
 
     @Transactional
@@ -185,24 +210,11 @@ public class CartApplicationService {
         CartEntity cart = findCart(cartId, customerId, guestAccessToken);
         List<CartItemEntity> items = cartItemRepository.findByCartIdOrderByIdAsc(cartId);
 
-        BigDecimal subtotal = items.stream()
-                .map(CartItemEntity::getLineTotal)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
-
-        CheckoutQuoteResult quote = checkoutQuoteService.quote(
-            new CheckoutQuoteRequest(subtotal, command.taxCode(), command.couponCodes(), null)
-        );
-
-        cart.setTaxCode(quote.taxCode());
-        cart.setCouponCodesJson(writeCouponCodes(command.couponCodes()));
-        cart.setSubtotalAmount(quote.baseAmount());
-        cart.setTaxAmount(quote.taxAmount());
-        cart.setDiscountAmount(quote.discountAmount());
-        cart.setTotalAmount(quote.finalAmount());
-        CartEntity saved = cartRepository.save(cart);
-
         List<String> coupons = command.couponCodes() == null ? List.of() : command.couponCodes();
-        return toSnapshot(saved, items, coupons);
+        cart.setTaxCode(command.taxCode());
+        cart.setCouponCodesJson(writeCouponCodes(coupons));
+        updateCartTotals(cart, items, coupons);
+        return toSnapshot(cart, items, coupons);
     }
 
     @Transactional
@@ -320,6 +332,22 @@ public class CartApplicationService {
 
     private CartSnapshot toSnapshot(CartEntity cart, List<CartItemEntity> items, List<String> couponCodes) {
         return toSnapshot(cart, items, couponCodes, null);
+    }
+
+    private void updateCartTotals(CartEntity cart, List<CartItemEntity> items, List<String> couponCodes) {
+        BigDecimal subtotal = items.stream()
+                .map(CartItemEntity::getLineTotal)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        CheckoutQuoteResult quote = checkoutQuoteService.quote(
+                new CheckoutQuoteRequest(subtotal, cart.getTaxCode(), couponCodes, null)
+        );
+
+        cart.setSubtotalAmount(quote.baseAmount());
+        cart.setTaxAmount(quote.taxAmount());
+        cart.setDiscountAmount(quote.discountAmount());
+        cart.setTotalAmount(quote.finalAmount());
+        cart.setTaxCode(quote.taxCode());
+        cartRepository.save(cart);
     }
 
     private CartSnapshot toSnapshot(CartEntity cart, List<CartItemEntity> items, List<String> couponCodes,

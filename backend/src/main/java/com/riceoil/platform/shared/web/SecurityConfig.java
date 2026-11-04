@@ -1,6 +1,7 @@
 package com.riceoil.platform.shared.web;
 
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -27,6 +28,7 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 import javax.crypto.SecretKey;
 import javax.crypto.spec.SecretKeySpec;
 import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
 import java.util.List;
 
 @Configuration
@@ -54,7 +56,7 @@ public class SecurityConfig {
                                 "/api/guest/**",
                                 "/api/orders/**"
                         ).permitAll()
-                        .requestMatchers("/api/customers/**").authenticated()
+                        .requestMatchers("/api/customers/**").hasRole("CUSTOMER")
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
                         .anyRequest().authenticated())
                 .httpBasic(Customizer.withDefaults())
@@ -62,12 +64,12 @@ public class SecurityConfig {
         return http.build();
     }
 
-    @Bean
-    public UserDetailsService userDetailsService(PasswordEncoder passwordEncoder,
-                                                @Value("${app.security.admin.username:admin}") String adminUsername,
-                                                @Value("${app.security.admin.password:change-me-admin-password}") String adminPassword,
-                                                @Value("${app.security.default.username:user}") String defaultUsername,
-                                                @Value("${app.security.default.password:change-me-user-password}") String defaultPassword) {
+    @Bean("staffUserDetailsService")
+    public UserDetailsService staffUserDetailsService(PasswordEncoder passwordEncoder,
+                                                      @Value("${app.security.admin.username:admin}") String adminUsername,
+                                                      @Value("${app.security.admin.password:change-me-admin-password}") String adminPassword,
+                                                      @Value("${app.security.default.username:user}") String defaultUsername,
+                                                      @Value("${app.security.default.password:change-me-user-password}") String defaultPassword) {
         var manager = new org.springframework.security.provisioning.InMemoryUserDetailsManager();
         manager.createUser(org.springframework.security.core.userdetails.User
                 .withUsername(adminUsername)
@@ -88,10 +90,11 @@ public class SecurityConfig {
     }
 
     @Bean
-    public DaoAuthenticationProvider daoAuthenticationProvider(UserDetailsService userDetailsService,
+    public DaoAuthenticationProvider daoAuthenticationProvider(
+                                                              @Qualifier("staffUserDetailsService") UserDetailsService staffUserDetailsService,
                                                               PasswordEncoder passwordEncoder) {
         DaoAuthenticationProvider provider = new DaoAuthenticationProvider();
-        provider.setUserDetailsService(userDetailsService);
+        provider.setUserDetailsService(staffUserDetailsService);
         provider.setPasswordEncoder(passwordEncoder);
         return provider;
     }
@@ -120,9 +123,13 @@ public class SecurityConfig {
     }
 
     @Bean
-    CorsConfigurationSource corsConfigurationSource() {
+    CorsConfigurationSource corsConfigurationSource(
+            @Value("${app.cors.allowed-origins:http://localhost:3000,http://localhost:3001}") String allowedOrigins) {
         CorsConfiguration config = new CorsConfiguration();
-        config.setAllowedOriginPatterns(List.of("http://localhost:3000", "http://localhost:3001"));
+        config.setAllowedOriginPatterns(Arrays.stream(allowedOrigins.split(","))
+                .map(String::trim)
+                .filter(origin -> !origin.isEmpty())
+                .toList());
         config.setAllowedMethods(List.of("GET", "POST", "PATCH", "DELETE", "OPTIONS"));
         config.setAllowedHeaders(List.of("*"));
         config.setExposedHeaders(List.of("Idempotency-Key", "Authorization"));

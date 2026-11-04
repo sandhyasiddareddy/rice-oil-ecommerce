@@ -1,13 +1,23 @@
 package com.riceoil.platform.customers.api.guest;
 
+import com.riceoil.platform.orders.application.OrderItemSnapshot;
 import com.riceoil.platform.shipping.application.ShipmentSnapshot;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 public record GuestOrderStatusResponse(
         Long orderId,
         String orderNumber,
         String status,
-        List<ShipmentSnapshot> shipments
+        String currency,
+        BigDecimal totalAmount,
+        BigDecimal shippingAmount,
+        List<OrderItemSnapshot> items,
+        List<ShipmentSnapshot> shipments,
+        boolean canRequestCancellation,
+        String cancellationStatus,
+        String refundStatus,
+        BigDecimal refundAmount
 ) {
 }

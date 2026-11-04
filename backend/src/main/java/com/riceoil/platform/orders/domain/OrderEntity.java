@@ -49,6 +49,9 @@ public class OrderEntity {
     @Column(name = "subtotal_amount", nullable = false, precision = 12, scale = 2)
     private BigDecimal subtotalAmount;
 
+    @Column(name = "shipping_amount", nullable = false, precision = 12, scale = 2)
+    private BigDecimal shippingAmount = BigDecimal.ZERO;
+
     @Column(name = "tax_amount", nullable = false, precision = 12, scale = 2)
     private BigDecimal taxAmount;
 
@@ -72,6 +75,12 @@ public class OrderEntity {
 
     @Column(name = "payment_linked_at")
     private OffsetDateTime paymentLinkedAt;
+
+    @Column(name = "shipping_address_json", columnDefinition = "text")
+    private String shippingAddressJson;
+
+    @Column(name = "billing_address_json", columnDefinition = "text")
+    private String billingAddressJson;
 
     @Column(name = "created_at", nullable = false)
     private OffsetDateTime createdAt;
@@ -151,6 +160,14 @@ public class OrderEntity {
         this.subtotalAmount = subtotalAmount;
     }
 
+    public BigDecimal getShippingAmount() {
+        return shippingAmount;
+    }
+
+    public void setShippingAmount(BigDecimal shippingAmount) {
+        this.shippingAmount = shippingAmount;
+    }
+
     public BigDecimal getTaxAmount() {
         return taxAmount;
     }
@@ -213,5 +230,21 @@ public class OrderEntity {
 
     public void setPaymentLinkedAt(OffsetDateTime paymentLinkedAt) {
         this.paymentLinkedAt = paymentLinkedAt;
+    }
+
+    public String getShippingAddressJson() {
+        return shippingAddressJson;
+    }
+
+    public void setShippingAddressJson(String shippingAddressJson) {
+        this.shippingAddressJson = shippingAddressJson;
+    }
+
+    public String getBillingAddressJson() {
+        return billingAddressJson;
+    }
+
+    public void setBillingAddressJson(String billingAddressJson) {
+        this.billingAddressJson = billingAddressJson;
     }
 }

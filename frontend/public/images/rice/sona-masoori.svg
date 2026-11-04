@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 480" role="img" aria-labelledby="title desc">
+  <title id="title">Sona Masoori rice</title>
+  <desc id="desc">Illustration of delicate medium-grain rice served in a ceramic bowl beside a pantry pouch.</desc>
+  <rect width="640" height="480" rx="28" fill="#f1ead6"/>
+  <circle cx="500" cy="86" r="96" fill="#e2d6ae"/>
+  <path d="M92 124h177l22 238H70z" fill="#bd9860"/>
+  <path d="M105 145h150l14 178H90z" fill="#fff4d8"/>
+  <path d="M126 184h107v54H126z" rx="12" fill="#a96c3e"/>
+  <text x="179" y="207" fill="#fffdf4" font-family="Georgia,serif" font-size="16" text-anchor="middle">FARMORA</text>
+  <text x="179" y="228" fill="#fffdf4" font-family="Georgia,serif" font-size="12" text-anchor="middle">SONA MASOORI</text>
+  <path d="M82 124h197l-13-24H96z" fill="#9e7b4e"/>
+  <ellipse cx="432" cy="337" rx="152" ry="78" fill="#7f5336"/>
+  <ellipse cx="432" cy="315" rx="152" ry="77" fill="#fffaf0"/>
+  <ellipse cx="432" cy="312" rx="123" ry="54" fill="#f0e2bc"/>
+  <g fill="#fff9ea">
+    <ellipse cx="367" cy="301" rx="6" ry="12" transform="rotate(-35 367 301)"/>
+    <ellipse cx="394" cy="284" rx="6" ry="12" transform="rotate(18 394 284)"/>
+    <ellipse cx="421" cy="309" rx="6" ry="12" transform="rotate(-14 421 309)"/>
+    <ellipse cx="450" cy="286" rx="6" ry="12" transform="rotate(34 450 286)"/>
+    <ellipse cx="478" cy="312" rx="6" ry="12" transform="rotate(-28 478 312)"/>
+    <ellipse cx="506" cy="294" rx="6" ry="12" transform="rotate(22 506 294)"/>
+    <ellipse cx="403" cy="330" rx="6" ry="12" transform="rotate(42 403 330)"/>
+    <ellipse cx="458" cy="334" rx="6" ry="12" transform="rotate(-40 458 334)"/>
+  </g>
+  <path d="M331 398h202" stroke="#d5c6a9" stroke-width="5" stroke-linecap="round"/>
+</svg>

@@ -8,6 +8,7 @@ public record CatalogProductDetailView(
         String slug,
         String description,
         String categorySlug,
+        String imageUrl,
         List<CatalogVariantView> variants
 ) {
 }

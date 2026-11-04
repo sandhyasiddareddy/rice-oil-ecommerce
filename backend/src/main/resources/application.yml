@@ -1,6 +1,23 @@
 spring:
+  config:
+    import: optional:file:.env[.properties]
   application:
     name: rice-oil-platform-backend
+  mail:
+    host: ${MAIL_HOST:}
+    port: ${MAIL_PORT:587}
+    username: ${MAIL_USERNAME:}
+    password: ${MAIL_PASSWORD:}
+    properties:
+      mail:
+        smtp:
+          auth: ${MAIL_SMTP_AUTH:true}
+          starttls:
+            enable: ${MAIL_SMTP_STARTTLS:true}
+  servlet:
+    multipart:
+      max-file-size: 5MB
+      max-request-size: 6MB
   datasource:
     url: ${DB_URL:jdbc:postgresql://localhost:5432/rice_oil}
     username: ${DB_USERNAME:riceoil}
@@ -16,6 +33,10 @@ spring:
     enabled: true
     locations: classpath:db/migration
 
+server:
+  port: ${PORT:8080}
+  forward-headers-strategy: native
+
 management:
   endpoints:
     web:
@@ -28,7 +49,28 @@ management:
       show-details: when_authorized
 
 app:
+  frontend-base-url: ${APP_FRONTEND_BASE_URL:http://localhost:3000}
+  cors:
+    allowed-origins: ${APP_CORS_ALLOWED_ORIGINS:http://localhost:3000,http://localhost:3001}
+  catalog:
+    sample-data:
+      enabled: ${SAMPLE_DATA_ENABLED:false}
+  orders:
+    unpaid-expiry-minutes: ${ORDER_UNPAID_EXPIRY_MINUTES:60}
+    expiry-lookback-hours: ${ORDER_EXPIRY_LOOKBACK_HOURS:48}
+    expiry-check-interval-ms: ${ORDER_EXPIRY_CHECK_INTERVAL_MS:300000}
+    delivery-estimate: ${ORDER_DELIVERY_ESTIMATE:5-7 working days}
+  mail:
+    from: ${MAIL_FROM:no-reply@farmora.local}
+  storage:
+    blob:
+      container: ${AZURE_STORAGE_BLOB_CONTAINER:product-images}
+      public-base-url: ${AZURE_STORAGE_BLOB_PUBLIC_BASE_URL:}
   security:
+    rate-limit:
+      enabled: ${AUTH_RATE_LIMIT_ENABLED:true}
+      max-requests: ${AUTH_RATE_LIMIT_MAX_REQUESTS:10}
+      window-seconds: ${AUTH_RATE_LIMIT_WINDOW_SECONDS:60}
     admin:
       username: ${APP_ADMIN_USERNAME:admin}
       password: ${APP_ADMIN_PASSWORD:change-me-admin-password}
@@ -41,9 +83,11 @@ app:
       ttl-minutes: ${JWT_TTL_MINUTES:120}
   payments:
     razorpay:
+      key-id: ${RAZORPAY_KEY_ID:}
       key-secret: ${RAZORPAY_KEY_SECRET:}
       webhook-secret: ${RAZORPAY_WEBHOOK_SECRET:}
+      base-url: ${RAZORPAY_BASE_URL:https://api.razorpay.com/v1}
 
 logging:
   pattern:
-    level: "%5p [corr:%X{correlationId}]"
+    level: "%5p [corr:%X{correlationId}] [cust:%X{customerId}] [sid:%X{sessionId}]"

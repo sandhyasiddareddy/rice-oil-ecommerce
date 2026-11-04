@@ -3,6 +3,7 @@ package com.riceoil.platform.catalog.application;
 import com.riceoil.platform.catalog.domain.CategoryEntity;
 import com.riceoil.platform.catalog.domain.CategoryRepository;
 import com.riceoil.platform.catalog.domain.ProductEntity;
+import com.riceoil.platform.catalog.domain.ProductImageRepository;
 import com.riceoil.platform.catalog.domain.ProductRepository;
 import com.riceoil.platform.catalog.domain.ProductVariantEntity;
 import com.riceoil.platform.catalog.domain.ProductVariantRepository;
@@ -19,13 +20,16 @@ public class CatalogQueryService {
     private final CategoryRepository categoryRepository;
     private final ProductRepository productRepository;
     private final ProductVariantRepository productVariantRepository;
+    private final ProductImageRepository productImageRepository;
 
     public CatalogQueryService(CategoryRepository categoryRepository,
                                ProductRepository productRepository,
-                               ProductVariantRepository productVariantRepository) {
+                               ProductVariantRepository productVariantRepository,
+                               ProductImageRepository productImageRepository) {
         this.categoryRepository = categoryRepository;
         this.productRepository = productRepository;
         this.productVariantRepository = productVariantRepository;
+        this.productImageRepository = productImageRepository;
     }
 
     @Transactional(readOnly = true)
@@ -79,6 +83,9 @@ public class CatalogQueryService {
                 product.getSlug(),
                 product.getDescription(),
                 product.getCategory().getSlug(),
+                productImageRepository.findFirstByProductIdAndPublishedTrueOrderBySortOrderAsc(product.getId())
+                        .map(image -> image.getImageUrl())
+                        .orElse(null),
                 variants
         );
     }
@@ -105,7 +112,10 @@ public class CatalogQueryService {
                 product.getCategory().getSlug(),
                 product.getDescription(),
                 startingPrice,
-                currency
+                currency,
+                productImageRepository.findFirstByProductIdAndPublishedTrueOrderBySortOrderAsc(product.getId())
+                        .map(image -> image.getImageUrl())
+                        .orElse(null)
         );
     }
 

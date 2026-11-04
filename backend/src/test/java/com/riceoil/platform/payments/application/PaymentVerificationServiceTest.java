@@ -8,6 +8,9 @@ import com.riceoil.platform.orders.domain.OrderRepository;
 import com.riceoil.platform.orders.domain.OrderStatus;
 import com.riceoil.platform.payments.domain.PaymentWebhookEventEntity;
 import com.riceoil.platform.payments.domain.PaymentWebhookEventRepository;
+import com.riceoil.platform.orders.domain.aftercare.RefundRequestEntity;
+import com.riceoil.platform.orders.domain.aftercare.RefundRequestRepository;
+import com.riceoil.platform.orders.domain.aftercare.RequestStatus;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -37,7 +40,16 @@ class PaymentVerificationServiceTest {
     private PaymentWebhookEventRepository webhookEventRepository;
 
     @Mock
+    private RefundRequestRepository refundRequestRepository;
+
+    @Mock
     private GuestOrderAccessService guestOrderAccessService;
+
+    @Mock
+    private com.riceoil.platform.orders.application.OrderFulfilmentService orderFulfilmentService;
+
+    @Mock
+    private RazorpayGateway razorpayGateway;
 
     private PaymentVerificationService service;
 
@@ -46,7 +58,10 @@ class PaymentVerificationServiceTest {
         service = new PaymentVerificationService(
                 orderRepository,
                 webhookEventRepository,
+                refundRequestRepository,
                 guestOrderAccessService,
+                orderFulfilmentService,
+                razorpayGateway,
                 "key-secret",
                 "webhook-secret",
                 new ObjectMapper()
@@ -58,6 +73,9 @@ class PaymentVerificationServiceTest {
         OrderEntity order = paymentPendingOrder();
         when(orderRepository.findById(15L)).thenReturn(Optional.of(order));
         when(orderRepository.save(any(OrderEntity.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(razorpayGateway.fetchPayment("pay_123")).thenReturn(new RazorpayPaymentDetails(
+                "pay_123", "rpay_gateway_order", 19000L, "INR", "captured", true
+        ));
         String signature = hmac("rpay_gateway_order|pay_123", "key-secret");
 
         service.verify(15L, "pay_123", signature, 42L, null);
@@ -83,7 +101,11 @@ class PaymentVerificationServiceTest {
         when(orderRepository.findById(15L)).thenReturn(Optional.of(order));
         when(orderRepository.save(any(OrderEntity.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(guestOrderAccessService.verifyAndGetOrder(15L, "guest-token"))
-                .thenReturn(new GuestOrderAccessSnapshot(15L, "ORD-15", OrderStatus.PAYMENT_PENDING));
+                .thenReturn(new GuestOrderAccessSnapshot(15L, "ORD-15", OrderStatus.PAYMENT_PENDING,
+                        "INR", new java.math.BigDecimal("190.00")));
+        when(razorpayGateway.fetchPayment("pay_123")).thenReturn(new RazorpayPaymentDetails(
+                "pay_123", "rpay_gateway_order", 19000L, "INR", "captured", true
+        ));
         String signature = hmac("rpay_gateway_order|pay_123", "key-secret");
 
         service.verify(15L, "pay_123", signature, null, "guest-token");
@@ -97,7 +119,7 @@ class PaymentVerificationServiceTest {
         OrderEntity order = paymentPendingOrder();
         String payload = "{\"id\":\"evt_1\",\"event\":\"payment.captured\","
                 + "\"payload\":{\"payment\":{\"entity\":{\"id\":\"pay_123\","
-                + "\"order_id\":\"rpay_gateway_order\"}}}}";
+                + "\"order_id\":\"rpay_gateway_order\",\"amount\":19000,\"currency\":\"INR\"}}}}";
         when(webhookEventRepository.findByEventId("evt_1")).thenReturn(Optional.empty());
         when(orderRepository.findByPaymentReference("rpay_gateway_order")).thenReturn(Optional.of(order));
         when(webhookEventRepository.save(any(PaymentWebhookEventEntity.class)))
@@ -110,6 +132,51 @@ class PaymentVerificationServiceTest {
         assertEquals("rpay_gateway_order", order.getPaymentReference());
         assertEquals("pay_123", order.getPaymentId());
         verify(orderRepository).save(order);
+    }
+
+    @Test
+    void processWebhook_shouldRefundAPaymentThatArrivesAfterTheOrderExpired() throws Exception {
+        OrderEntity order = paymentPendingOrder();
+        order.setStatus(OrderStatus.CANCELLED);
+        order.setOrderNumber("ORD-15");
+        String payload = "{\"id\":\"evt_2\",\"event\":\"payment.captured\","
+                + "\"payload\":{\"payment\":{\"entity\":{\"id\":\"pay_123\","
+                + "\"order_id\":\"rpay_gateway_order\",\"amount\":19000,\"currency\":\"INR\"}}}}";
+        when(webhookEventRepository.findByEventId("evt_2")).thenReturn(Optional.empty());
+        when(orderRepository.findByPaymentReference("rpay_gateway_order")).thenReturn(Optional.of(order));
+        when(webhookEventRepository.save(any(PaymentWebhookEventEntity.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+        when(razorpayGateway.createRefund("pay_123", 19000L, "late-ORD-15"))
+                .thenReturn(new RazorpayRefundDetails("rfnd_1", "pending"));
+
+        service.processWebhook(payload, hmac(payload, "webhook-secret"));
+
+        assertEquals(OrderStatus.CANCELLED, order.getStatus());
+        var captor = org.mockito.ArgumentCaptor.forClass(RefundRequestEntity.class);
+        verify(refundRequestRepository, org.mockito.Mockito.atLeastOnce()).save(captor.capture());
+        RefundRequestEntity saved = captor.getValue();
+        assertEquals("rfnd_1", saved.getProviderRefundId());
+        assertEquals(RequestStatus.PENDING, saved.getStatus());
+        verify(orderFulfilmentService, org.mockito.Mockito.never()).onPaid(any());
+    }
+
+    @Test
+    void verify_shouldRefundAndReportCancelledWhenOrderAlreadyExpired() throws Exception {
+        OrderEntity order = paymentPendingOrder();
+        order.setStatus(OrderStatus.CANCELLED);
+        order.setOrderNumber("ORD-15");
+        when(orderRepository.findById(15L)).thenReturn(Optional.of(order));
+        when(razorpayGateway.fetchPayment("pay_123")).thenReturn(new RazorpayPaymentDetails(
+                "pay_123", "rpay_gateway_order", 19000L, "INR", "captured", true
+        ));
+        when(razorpayGateway.createRefund("pay_123", 19000L, "late-ORD-15"))
+                .thenReturn(new RazorpayRefundDetails("rfnd_1", "processed"));
+
+        RazorpayVerifyResult result = service.verify(15L, "pay_123", hmac("rpay_gateway_order|pay_123", "key-secret"), 42L, null);
+
+        assertEquals(OrderStatus.CANCELLED, result.status());
+        assertEquals(false, result.verified());
+        verify(razorpayGateway).createRefund("pay_123", 19000L, "late-ORD-15");
     }
 
     @Test
@@ -127,6 +194,8 @@ class PaymentVerificationServiceTest {
         order.setPaymentProvider("RAZORPAY");
         order.setPaymentReference("rpay_gateway_order");
         order.setStatus(OrderStatus.PAYMENT_PENDING);
+        order.setCurrency("INR");
+        order.setTotalAmount(new java.math.BigDecimal("190.00"));
         return order;
     }
 

@@ -54,6 +54,7 @@ class CheckoutOrderControllerSecurityTest {
             new BigDecimal("200.00"),
             new BigDecimal("10.00"),
             new BigDecimal("20.00"),
+            new BigDecimal("0.00"),
             new BigDecimal("190.00"),
             "buyer@example.com"
         ));
@@ -83,6 +84,7 @@ class CheckoutOrderControllerSecurityTest {
                 new BigDecimal("200.00"),
                 new BigDecimal("10.00"),
                 new BigDecimal("20.00"),
+                new BigDecimal("0.00"),
                 new BigDecimal("190.00"),
                 "buyer@example.com"
         ));
@@ -104,6 +106,9 @@ class CheckoutOrderControllerSecurityTest {
     }
 
     private String validPayload() {
-        return "{\"cartId\":9,\"customerEmail\":\"buyer@example.com\"}";
+        return "{\"cartId\":9,\"customerEmail\":\"buyer@example.com\","
+                + "\"shippingAddress\":{\"fullName\":\"Buyer\",\"phone\":\"9876543210\","
+                + "\"line1\":\"1 Main Street\",\"city\":\"Chennai\",\"state\":\"Tamil Nadu\","
+                + "\"postalCode\":\"600001\",\"country\":\"IN\"}}";
     }
 }

@@ -23,7 +23,7 @@ export default async function ProductDetailPage({ params }: ProductDetailPagePro
       <nav aria-label="Breadcrumb" className="breadcrumbs">
         <Link href="/">Home</Link>
         <span aria-hidden="true">/</span>
-        <Link href="/catalog">Shop</Link>
+        <Link href="/catalog">Products</Link>
         <span aria-hidden="true">/</span>
         <span aria-current="page">{product?.name ?? "Product"}</span>
       </nav>

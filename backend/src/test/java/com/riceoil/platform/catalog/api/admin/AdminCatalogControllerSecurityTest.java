@@ -8,6 +8,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.security.test.context.support.WithMockUser;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.httpBasic;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -63,6 +64,23 @@ class AdminCatalogControllerSecurityTest {
                 .andExpect(jsonPath("$.name").value("Rice"))
                 .andExpect(jsonPath("$.slug").value("rice"))
                 .andExpect(jsonPath("$.active").value(true));
+    }
+
+    @Test
+    void configuredBasicAdmin_shouldSucceed() throws Exception {
+        CategoryEntity category = new CategoryEntity();
+        setPrivateId(category, 10L);
+        category.setName("Rice");
+        category.setSlug("rice");
+        category.setDescription("desc");
+        category.setActive(true);
+        when(catalogAdminService.createCategory("Rice", "rice", "desc", true)).thenReturn(category);
+
+        mockMvc.perform(post("/api/admin/catalog/categories")
+                        .with(httpBasic("admin", "change-me-admin-password"))
+                        .contentType("application/json")
+                        .content("{\"name\":\"Rice\",\"slug\":\"rice\",\"description\":\"desc\",\"active\":true}"))
+                .andExpect(status().isOk());
     }
 
     private void setPrivateId(Object target, Long id) throws Exception {

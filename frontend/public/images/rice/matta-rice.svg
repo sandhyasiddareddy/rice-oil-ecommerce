@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 480" role="img" aria-labelledby="title desc">
+  <title id="title">Kerala Matta rice</title>
+  <desc id="desc">Illustration of Kerala Matta red rice served in a ceramic bowl beside a pantry pouch.</desc>
+  <rect width="640" height="480" rx="28" fill="#f1e7d8"/>
+  <circle cx="500" cy="86" r="96" fill="#dfc5a5"/>
+  <path d="M92 124h177l22 238H70z" fill="#a2674a"/>
+  <path d="M105 145h150l14 178H90z" fill="#f3e5d1"/>
+  <path d="M126 184h107v54H126z" rx="12" fill="#874b3d"/>
+  <text x="179" y="207" fill="#fffdf4" font-family="Georgia,serif" font-size="16" text-anchor="middle">FARMORA</text>
+  <text x="179" y="228" fill="#fffdf4" font-family="Georgia,serif" font-size="13" text-anchor="middle">KERALA MATTA</text>
+  <path d="M82 124h197l-13-24H96z" fill="#82523d"/>
+  <ellipse cx="432" cy="337" rx="152" ry="78" fill="#673c31"/>
+  <ellipse cx="432" cy="315" rx="152" ry="77" fill="#f7eee2"/>
+  <ellipse cx="432" cy="312" rx="123" ry="54" fill="#a95842"/>
+  <g fill="#d28c68">
+    <ellipse cx="367" cy="301" rx="5" ry="15" transform="rotate(-35 367 301)"/>
+    <ellipse cx="394" cy="284" rx="5" ry="15" transform="rotate(18 394 284)"/>
+    <ellipse cx="421" cy="309" rx="5" ry="15" transform="rotate(-14 421 309)"/>
+    <ellipse cx="450" cy="286" rx="5" ry="15" transform="rotate(34 450 286)"/>
+    <ellipse cx="478" cy="312" rx="5" ry="15" transform="rotate(-28 478 312)"/>
+    <ellipse cx="506" cy="294" rx="5" ry="15" transform="rotate(22 506 294)"/>
+    <ellipse cx="403" cy="330" rx="5" ry="15" transform="rotate(42 403 330)"/>
+    <ellipse cx="458" cy="334" rx="5" ry="15" transform="rotate(-40 458 334)"/>
+  </g>
+  <path d="M331 398h202" stroke="#d3baa0" stroke-width="5" stroke-linecap="round"/>
+</svg>

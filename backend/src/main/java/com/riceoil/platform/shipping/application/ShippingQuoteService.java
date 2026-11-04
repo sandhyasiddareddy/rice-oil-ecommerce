@@ -21,10 +21,13 @@ public class ShippingQuoteService {
     private final CartRepository cartRepository;
     private final CartApplicationService cartApplicationService;
     private final ShippingQuoteRepository shippingQuoteRepository;
+    private final ShippingFeeService shippingFeeService;
 
     public ShippingQuoteService(CartRepository cartRepository,
                                 CartApplicationService cartApplicationService,
-                                ShippingQuoteRepository shippingQuoteRepository) {
+                                ShippingQuoteRepository shippingQuoteRepository,
+                                ShippingFeeService shippingFeeService) {
+        this.shippingFeeService = shippingFeeService;
         this.cartRepository = cartRepository;
         this.cartApplicationService = cartApplicationService;
         this.shippingQuoteRepository = shippingQuoteRepository;
@@ -40,7 +43,7 @@ public class ShippingQuoteService {
         quote.setQuoteCode(generateQuoteCode());
         quote.setCart(cart);
         quote.setStatus(ShippingQuoteStatus.AVAILABLE);
-        quote.setShippingFee(computeShippingFee(cart.getTotalAmount()));
+        quote.setShippingFee(shippingFeeService.feeFor(cart.getTotalAmount()));
         quote.setCurrency(cart.getCurrency());
         quote.setProvider("SHIPROCKET");
         quote.setServiceLevel("STANDARD");
@@ -61,19 +64,6 @@ public class ShippingQuoteService {
                 : quote.getStatus();
         quote.setStatus(status);
         return toSnapshot(quote);
-    }
-
-    private BigDecimal computeShippingFee(BigDecimal orderTotal) {
-        if (orderTotal == null) {
-            return new BigDecimal("80.00");
-        }
-        if (orderTotal.compareTo(new BigDecimal("999.00")) >= 0) {
-            return new BigDecimal("0.00");
-        }
-        if (orderTotal.compareTo(new BigDecimal("499.00")) >= 0) {
-            return new BigDecimal("40.00");
-        }
-        return new BigDecimal("80.00");
     }
 
     private String generateQuoteCode() {

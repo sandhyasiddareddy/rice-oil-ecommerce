@@ -65,6 +65,18 @@ public class ShipmentTrackingService {
         return toSnapshot(saved);
     }
 
+    @Transactional
+    public ShipmentSnapshot updateTracking(Long shipmentId, String provider, String trackingNumber, String trackingUrl) {
+        ShipmentEntity shipment = shipmentRepository.findById(shipmentId)
+                .orElseThrow(() -> new ResourceNotFoundException("Shipment not found: " + shipmentId));
+        if (provider != null && !provider.isBlank()) {
+            shipment.setProvider(normalizeProvider(provider));
+        }
+        shipment.setTrackingNumber(cleanOptional(trackingNumber, 120));
+        shipment.setTrackingUrl(cleanOptional(trackingUrl, 500));
+        return toSnapshot(shipmentRepository.save(shipment));
+    }
+
     @Transactional(readOnly = true)
     public List<ShipmentSnapshot> getOrderShipments(Long orderId) {
         return shipmentRepository.findByOrderIdOrderByCreatedAtAsc(orderId).stream()

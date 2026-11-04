@@ -13,6 +13,7 @@ public record OrderSnapshot(
         BigDecimal subtotalAmount,
         BigDecimal taxAmount,
         BigDecimal discountAmount,
+        BigDecimal shippingAmount,
         BigDecimal totalAmount,
         String customerEmail
 ) {

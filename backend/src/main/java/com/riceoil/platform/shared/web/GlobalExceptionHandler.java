@@ -1,5 +1,6 @@
 package com.riceoil.platform.shared.web;
 
+import com.riceoil.platform.shared.observability.BusinessLog;
 import com.riceoil.platform.shared.observability.CorrelationIdFilter;
 import com.riceoil.platform.customers.application.InvalidCredentialsException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -26,61 +27,61 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(ResourceNotFoundException.class)
     public ResponseEntity<ApiErrorResponse> handleNotFound(ResourceNotFoundException ex,
                                                            HttpServletRequest request) {
-        return build(HttpStatus.NOT_FOUND, "NOT_FOUND", "The requested resource could not be found.", request);
+        return build(ex, HttpStatus.NOT_FOUND, "NOT_FOUND", "The requested resource could not be found.", request);
     }
 
     @ExceptionHandler(DuplicateResourceException.class)
     public ResponseEntity<ApiErrorResponse> handleConflict(DuplicateResourceException ex,
                                                            HttpServletRequest request) {
-        return build(HttpStatus.CONFLICT, "DUPLICATE_RESOURCE", "We could not complete that request.", request);
+        return build(ex, HttpStatus.CONFLICT, "DUPLICATE_RESOURCE", "We could not complete that request.", request);
     }
 
     @ExceptionHandler(InvalidCredentialsException.class)
     public ResponseEntity<ApiErrorResponse> handleInvalidCredentials(InvalidCredentialsException ex,
                                                                      HttpServletRequest request) {
-                                                                    return build(HttpStatus.UNAUTHORIZED, "AUTHENTICATION_FAILED",
+                                                                    return build(ex, HttpStatus.UNAUTHORIZED, "AUTHENTICATION_FAILED",
                 "Email or password is incorrect.", request);
     }
 
     @ExceptionHandler(AccessDeniedException.class)
     public ResponseEntity<ApiErrorResponse> handleAccessDenied(AccessDeniedException ex,
                                                                 HttpServletRequest request) {
-        return build(HttpStatus.FORBIDDEN, "ACCESS_DENIED",
+        return build(ex, HttpStatus.FORBIDDEN, "ACCESS_DENIED",
                 "You don't have permission to access this resource.", request);
     }
 
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<ApiErrorResponse> handleIllegalArgument(IllegalArgumentException ex,
                                                                   HttpServletRequest request) {
-        return build(HttpStatus.BAD_REQUEST, "INVALID_INPUT",
+        return build(ex, HttpStatus.BAD_REQUEST, "INVALID_INPUT",
             "Please check your information and try again.", request);
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ApiErrorResponse> handleValidationError(MethodArgumentNotValidException ex,
                                                                   HttpServletRequest request) {
-        return build(HttpStatus.BAD_REQUEST, "VALIDATION_ERROR",
+        return build(ex, HttpStatus.BAD_REQUEST, "VALIDATION_ERROR",
             "Some information is missing or invalid. Please check and try again.", request);
     }
 
     @ExceptionHandler(ConstraintViolationException.class)
     public ResponseEntity<ApiErrorResponse> handleConstraintViolation(ConstraintViolationException ex,
                                                                       HttpServletRequest request) {
-        return build(HttpStatus.BAD_REQUEST, "CONSTRAINT_VIOLATION",
+        return build(ex, HttpStatus.BAD_REQUEST, "CONSTRAINT_VIOLATION",
             "Please check your information and try again.", request);
     }
 
     @ExceptionHandler(MissingRequestHeaderException.class)
     public ResponseEntity<ApiErrorResponse> handleMissingHeader(MissingRequestHeaderException ex,
                                                                 HttpServletRequest request) {
-        return build(HttpStatus.BAD_REQUEST, "MISSING_HEADER",
+        return build(ex, HttpStatus.BAD_REQUEST, "MISSING_HEADER",
             "A required request detail is missing.", request);
     }
 
     @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
     public ResponseEntity<ApiErrorResponse> handleMethodNotSupported(HttpRequestMethodNotSupportedException ex,
                                                                       HttpServletRequest request) {
-        return build(HttpStatus.METHOD_NOT_ALLOWED, "METHOD_NOT_ALLOWED",
+        return build(ex, HttpStatus.METHOD_NOT_ALLOWED, "METHOD_NOT_ALLOWED",
                 "This request method is not supported for the requested resource.", request);
     }
 
@@ -88,16 +89,26 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ApiErrorResponse> handleUnexpected(Exception ex, HttpServletRequest request) {
         LOGGER.error("Unhandled API error correlationId={} path={}",
             MDC.get(CorrelationIdFilter.CORRELATION_ID_KEY), request.getRequestURI(), ex);
-        return build(HttpStatus.INTERNAL_SERVER_ERROR,
+        return build(ex, HttpStatus.INTERNAL_SERVER_ERROR,
                 "INTERNAL_ERROR",
                 "An unexpected error occurred. Please retry or contact support.",
                 request);
     }
 
-    private ResponseEntity<ApiErrorResponse> build(HttpStatus status,
+    private ResponseEntity<ApiErrorResponse> build(Throwable ex,
+                                                   HttpStatus status,
                                                    String code,
                                                    String message,
                                                    HttpServletRequest request) {
+        if (status != HttpStatus.INTERNAL_SERVER_ERROR) {
+            BusinessLog.warn("REQUEST_REJECTED",
+                    "status", status.value(),
+                    "code", code,
+                    "method", request.getMethod(),
+                    "path", request.getRequestURI(),
+                    "exception", ex.getClass().getSimpleName(),
+                    "reason", ex.getMessage());
+        }
         ApiErrorResponse body = new ApiErrorResponse(
                 OffsetDateTime.now(),
                 status.value(),

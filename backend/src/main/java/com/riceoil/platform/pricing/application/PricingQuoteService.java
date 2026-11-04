@@ -31,8 +31,8 @@ public class PricingQuoteService {
             );
         }
 
-        Optional<TaxRuleEntity> optionalRule = taxRuleRepository.findFirstByCodeAndActiveTrueOrderByEffectiveFromDesc(
-                taxCode.trim().toUpperCase()
+        Optional<TaxRuleEntity> optionalRule = taxRuleRepository.findEffective(
+                taxCode.trim().toUpperCase(), java.time.OffsetDateTime.now()
         );
 
         if (optionalRule.isEmpty()) {

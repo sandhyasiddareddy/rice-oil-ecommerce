@@ -66,7 +66,9 @@ public class GuestOrderAccessService {
         return new GuestOrderAccessSnapshot(
                 entity.getOrder().getId(),
                 entity.getOrder().getOrderNumber(),
-                entity.getOrder().getStatus()
+                entity.getOrder().getStatus(),
+                entity.getOrder().getCurrency(),
+                entity.getOrder().getTotalAmount()
         );
     }
 

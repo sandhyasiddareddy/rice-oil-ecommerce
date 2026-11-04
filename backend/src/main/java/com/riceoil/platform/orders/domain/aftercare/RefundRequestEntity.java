@@ -36,6 +36,12 @@ public class RefundRequestEntity {
     @Column(length = 300)
     private String reason;
 
+    @Column(name = "provider_refund_id", length = 120)
+    private String providerRefundId;
+
+    @Column(name = "provider_status", length = 40)
+    private String providerStatus;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     private RequestStatus status;
@@ -92,5 +98,21 @@ public class RefundRequestEntity {
 
     public void setStatus(RequestStatus status) {
         this.status = status;
+    }
+
+    public String getProviderRefundId() {
+        return providerRefundId;
+    }
+
+    public void setProviderRefundId(String providerRefundId) {
+        this.providerRefundId = providerRefundId;
+    }
+
+    public String getProviderStatus() {
+        return providerStatus;
+    }
+
+    public void setProviderStatus(String providerStatus) {
+        this.providerStatus = providerStatus;
     }
 }

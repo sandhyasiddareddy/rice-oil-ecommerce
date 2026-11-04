@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { useState } from "react";
 import { storefrontApi, type CatalogProductDetail } from "../../../lib/api";
 import { ensureCart, readGuestCartAccessToken } from "../../../lib/session";
@@ -35,6 +36,15 @@ export default function ProductPurchase({ product }: { product: CatalogProductDe
 
   return (
     <section className="productPurchase">
+      {product.imageUrl ? (
+        <Image
+          className="productDetailImage"
+          src={product.imageUrl}
+          alt={product.name}
+          width={800}
+          height={600}
+        />
+      ) : null}
       {product.variants.length > 0 ? (
         <fieldset className="variantPicker">
           <legend>Choose a size</legend>

@@ -68,15 +68,93 @@ public class CustomerAccountService {
                                            String postalCode, String country, boolean defaultAddress,
                                            boolean shippingAddress, boolean billingAddress) {
         CustomerAccountEntity customer = getByEmail(email);
-        List<CustomerAddressEntity> existingAddresses = customerAddressRepository.findByCustomerIdOrderByCreatedAtAsc(customer.getId());
-
+        List<CustomerAddressEntity> existingAddresses =
+                customerAddressRepository.findByCustomerIdOrderByCreatedAtAsc(customer.getId());
         CustomerAddressEntity address = new CustomerAddressEntity();
         address.setCustomer(customer);
+        boolean makeDefault = defaultAddress || existingAddresses.isEmpty();
+        applyAddress(address, customer, label, fullName, phone, line1, line2, city, state, postalCode, country,
+                makeDefault, shippingAddress || existingAddresses.isEmpty(), billingAddress);
+        if (makeDefault) {
+            clearDefaultAddress(existingAddresses);
+        }
+        return customerAddressRepository.save(address);
+    }
+
+    @Transactional
+    public CustomerAddressEntity updateAddress(String email, Long addressId, String label, String fullName, String phone,
+                                               String line1, String line2, String city, String state,
+                                               String postalCode, String country, boolean defaultAddress,
+                                               boolean shippingAddress, boolean billingAddress) {
+        CustomerAccountEntity customer = getByEmail(email);
+        CustomerAddressEntity address = getOwnedAddress(customer, addressId);
+        List<CustomerAddressEntity> existingAddresses =
+                customerAddressRepository.findByCustomerIdOrderByCreatedAtAsc(customer.getId());
+        boolean wasDefault = address.isDefaultAddress();
+        boolean noExistingDefault = existingAddresses.stream()
+                .noneMatch(existing -> !existing.getId().equals(addressId) && existing.isDefaultAddress());
+        boolean makeDefault = defaultAddress || noExistingDefault;
+        applyAddress(address, customer, label, fullName, phone, line1, line2, city, state, postalCode, country,
+                makeDefault, shippingAddress, billingAddress);
+        if (makeDefault) {
+            clearDefaultAddress(existingAddresses);
+            address.setDefaultAddress(true);
+        } else if (wasDefault) {
+            address.setDefaultAddress(false);
+            existingAddresses.stream()
+                    .filter(existing -> !existing.getId().equals(addressId))
+                    .findFirst()
+                    .ifPresent(nextDefault -> {
+                        nextDefault.setDefaultAddress(true);
+                        customerAddressRepository.save(nextDefault);
+                    });
+        }
+        return customerAddressRepository.save(address);
+    }
+
+    @Transactional
+    public void deleteAddress(String email, Long addressId) {
+        CustomerAccountEntity customer = getByEmail(email);
+        CustomerAddressEntity address = getOwnedAddress(customer, addressId);
+        boolean wasDefault = address.isDefaultAddress();
+        customerAddressRepository.delete(address);
+        if (wasDefault) {
+            customerAddressRepository.findByCustomerIdOrderByCreatedAtAsc(customer.getId()).stream()
+                    .findFirst()
+                    .ifPresent(nextDefault -> {
+                        nextDefault.setDefaultAddress(true);
+                        customerAddressRepository.save(nextDefault);
+                    });
+        }
+    }
+
+    private CustomerAddressEntity getOwnedAddress(CustomerAccountEntity customer, Long addressId) {
+        CustomerAddressEntity address = customerAddressRepository.findById(addressId)
+                .orElseThrow(() -> new ResourceNotFoundException("Address not found: " + addressId));
+        if (!address.getCustomer().getId().equals(customer.getId())) {
+            throw new ResourceNotFoundException("Address not found: " + addressId);
+        }
+        return address;
+    }
+
+    private void clearDefaultAddress(List<CustomerAddressEntity> addresses) {
+        addresses.stream()
+                .filter(CustomerAddressEntity::isDefaultAddress)
+                .forEach(existing -> {
+                    existing.setDefaultAddress(false);
+                    customerAddressRepository.save(existing);
+                });
+    }
+
+    private void applyAddress(CustomerAddressEntity address, CustomerAccountEntity customer, String label,
+                              String fullName, String phone, String line1, String line2, String city, String state,
+                              String postalCode, String country, boolean defaultAddress, boolean shippingAddress,
+                              boolean billingAddress) {
         address.setLabel(label == null || label.isBlank() ? "Home" : label.trim());
         address.setFullName(fullName == null || fullName.isBlank() ? customer.getFullName() : fullName.trim());
         address.setPhone(phone == null ? "" : phone.trim());
         address.setLine1(line1 == null ? "" : line1.trim());
-        address.setLine2(line2 == null ? null : line2.trim());
+        address.setLine2(line2 == null || line2.isBlank() ? null : line2.trim());
         address.setCity(city == null ? "" : city.trim());
         address.setState(state == null ? "" : state.trim());
         address.setPostalCode(postalCode == null ? "" : postalCode.trim());
@@ -84,25 +162,10 @@ public class CustomerAccountService {
         address.setDefaultAddress(defaultAddress);
         address.setShippingAddress(shippingAddress);
         address.setBillingAddress(billingAddress);
-
-        if (address.getLine1().isBlank() || address.getCity().isBlank() || address.getState().isBlank() || address.getPostalCode().isBlank()) {
+        if (address.getPhone().isBlank() || address.getLine1().isBlank() || address.getCity().isBlank()
+                || address.getState().isBlank() || address.getPostalCode().isBlank()) {
             throw new IllegalArgumentException("Address fields are incomplete");
         }
-
-        if (defaultAddress) {
-            existingAddresses.forEach(existing -> {
-                if (existing.isDefaultAddress()) {
-                    existing.setDefaultAddress(false);
-                    customerAddressRepository.save(existing);
-                }
-            });
-        }
-
-        if (!shippingAddress && !billingAddress && existingAddresses.isEmpty()) {
-            address.setShippingAddress(true);
-        }
-
-        return customerAddressRepository.save(address);
     }
 
     @Transactional(readOnly = true)

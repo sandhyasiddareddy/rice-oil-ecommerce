@@ -15,6 +15,7 @@ import java.util.List;
 
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -33,7 +34,7 @@ class OrderAftercareControllerTest {
 
     @Test
     void cancellation_shouldCreateRequest() throws Exception {
-        when(aftercareService.requestCancellation(eq(8L), eq("Wrong item")))
+        when(aftercareService.requestCancellation(eq(8L), eq("Wrong item"), isNull(), isNull()))
                 .thenReturn(new CancellationSnapshot(1L, 8L, "REQUESTED", "Wrong item"));
 
         mockMvc.perform(post("/api/orders/8/cancellation-requests")
@@ -48,9 +49,12 @@ class OrderAftercareControllerTest {
         when(aftercareService.requestRefund(
                 eq(8L),
                 argThat(amount -> amount != null && amount.compareTo(new BigDecimal("90.00")) == 0),
-                eq("Damaged")
+                eq("Damaged"),
+                isNull(),
+                isNull()
         ))
-                .thenReturn(new RefundSnapshot(2L, 8L, new BigDecimal("90.00"), "REQUESTED", "Damaged"));
+                .thenReturn(new RefundSnapshot(2L, 8L, new BigDecimal("90.00"),
+                        "REQUESTED", "Damaged", null, null));
 
         mockMvc.perform(post("/api/orders/8/refund-requests")
                         .contentType("application/json")
@@ -61,8 +65,9 @@ class OrderAftercareControllerTest {
 
     @Test
     void refunds_shouldReturnHistory() throws Exception {
-        when(aftercareService.refunds(8L)).thenReturn(List.of(
-                new RefundSnapshot(2L, 8L, new BigDecimal("90.00"), "REQUESTED", "Damaged")
+        when(aftercareService.refunds(eq(8L), isNull(), isNull())).thenReturn(List.of(
+                new RefundSnapshot(2L, 8L, new BigDecimal("90.00"),
+                        "REQUESTED", "Damaged", null, null)
         ));
 
         mockMvc.perform(get("/api/orders/8/refunds"))

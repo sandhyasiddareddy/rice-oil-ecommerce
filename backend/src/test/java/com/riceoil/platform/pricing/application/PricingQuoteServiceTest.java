@@ -32,7 +32,7 @@ class PricingQuoteServiceTest {
         rule.setInclusive(false);
         rule.setActive(true);
 
-        when(taxRuleRepository.findFirstByCodeAndActiveTrueOrderByEffectiveFromDesc("GST5"))
+        when(taxRuleRepository.findEffective(org.mockito.ArgumentMatchers.eq("GST5"), org.mockito.ArgumentMatchers.any()))
                 .thenReturn(Optional.of(rule));
 
         PricingQuoteResult result = pricingQuoteService.quote(new BigDecimal("100.00"), "GST5");
@@ -50,7 +50,7 @@ class PricingQuoteServiceTest {
         rule.setInclusive(true);
         rule.setActive(true);
 
-        when(taxRuleRepository.findFirstByCodeAndActiveTrueOrderByEffectiveFromDesc("GST5I"))
+        when(taxRuleRepository.findEffective(org.mockito.ArgumentMatchers.eq("GST5I"), org.mockito.ArgumentMatchers.any()))
                 .thenReturn(Optional.of(rule));
 
         PricingQuoteResult result = pricingQuoteService.quote(new BigDecimal("105.00"), "GST5I");

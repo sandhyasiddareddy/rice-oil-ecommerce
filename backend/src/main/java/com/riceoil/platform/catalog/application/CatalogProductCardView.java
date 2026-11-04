@@ -9,6 +9,7 @@ public record CatalogProductCardView(
         String categorySlug,
         String description,
         BigDecimal startingPrice,
-        String currency
+        String currency,
+        String imageUrl
 ) {
 }

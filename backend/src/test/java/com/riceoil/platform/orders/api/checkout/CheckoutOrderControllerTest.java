@@ -53,6 +53,7 @@ class CheckoutOrderControllerTest {
                 new BigDecimal("200.00"),
                 new BigDecimal("10.00"),
                 new BigDecimal("20.00"),
+                new BigDecimal("0.00"),
                 new BigDecimal("190.00"),
                 "buyer@example.com"
         ));
@@ -60,7 +61,7 @@ class CheckoutOrderControllerTest {
         mockMvc.perform(post("/api/checkout/orders")
                         .header("Idempotency-Key", "idem-1")
                         .contentType("application/json")
-                        .content("{\"cartId\":9,\"customerEmail\":\"buyer@example.com\"}"))
+                        .content(validPayload()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(15))
                 .andExpect(jsonPath("$.cartId").value(9))
@@ -76,5 +77,12 @@ class CheckoutOrderControllerTest {
                         .contentType("application/json")
                         .content("{\"customerEmail\":\"buyer@example.com\"}"))
                 .andExpect(status().isBadRequest());
+    }
+
+    private String validPayload() {
+        return "{\"cartId\":9,\"customerEmail\":\"buyer@example.com\","
+                + "\"shippingAddress\":{\"fullName\":\"Buyer\",\"phone\":\"9876543210\","
+                + "\"line1\":\"1 Main Street\",\"city\":\"Chennai\",\"state\":\"Tamil Nadu\","
+                + "\"postalCode\":\"600001\",\"country\":\"IN\"}}";
     }
 }

@@ -1,34 +1,49 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import Image from "next/image";
+import { useSearchParams } from "next/navigation";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import { storefrontApi, type CatalogCategory, type CatalogProduct } from "../../lib/api";
 import { ensureCart, readGuestCartAccessToken } from "../../lib/session";
 
 export default function CatalogPage() {
+  return (
+    <Suspense fallback={null}>
+      <CatalogContent />
+    </Suspense>
+  );
+}
+
+function CatalogContent() {
+  const searchParams = useSearchParams();
+  const queryParam = searchParams.get("q") ?? "";
+  const categoryParam = searchParams.get("category") ?? "";
   const [categories, setCategories] = useState<CatalogCategory[]>([]);
   const [products, setProducts] = useState<CatalogProduct[]>([]);
   const [selectedCategory, setSelectedCategory] = useState("");
-  const [searchText, setSearchText] = useState("");
   const [sortBy, setSortBy] = useState("featured");
   const [busyAction, setBusyAction] = useState("");
   const [statusText, setStatusText] = useState("Loading catalog...");
 
   useEffect(() => {
-    void loadInitial();
-  }, []);
+    void loadInitial(queryParam, categoryParam);
+  }, [queryParam, categoryParam]);
 
-  async function loadInitial() {
+  async function loadInitial(query: string, requestedCategory: string) {
     try {
-      const requestedCategory = new URLSearchParams(window.location.search).get("category") ?? "";
       const [categoryRows, productRows] = await Promise.all([
         storefrontApi.listCategories(),
-        storefrontApi.listProducts(requestedCategory || undefined)
+        query ? storefrontApi.searchProducts(query) : storefrontApi.listProducts(requestedCategory || undefined)
       ]);
       setCategories(categoryRows);
-      setSelectedCategory(requestedCategory);
+      setSelectedCategory(query ? "" : requestedCategory);
       setProducts(productRows);
-      setStatusText(productRows.length === 0 ? "No products match this selection." : `${productRows.length} products.`);
+      setStatusText(
+        productRows.length === 0
+          ? query ? "No products match your search." : "No products match this selection."
+          : `${productRows.length} products.`
+      );
     } catch (error) {
       setStatusText(normalizeError(error));
     }
@@ -41,19 +56,6 @@ export default function CatalogPage() {
       setSelectedCategory(categorySlug);
       setProducts(rows);
       setStatusText(rows.length === 0 ? "No products match this selection." : `${rows.length} products.`);
-    } catch (error) {
-      setStatusText(normalizeError(error));
-    } finally {
-      setBusyAction("");
-    }
-  }
-
-  async function searchProducts() {
-    setBusyAction("search");
-    try {
-      const rows = searchText.trim() ? await storefrontApi.searchProducts(searchText.trim()) : await storefrontApi.listProducts();
-      setProducts(rows);
-      setStatusText(rows.length === 0 ? "No products match your search." : `${rows.length} products.`);
     } catch (error) {
       setStatusText(normalizeError(error));
     } finally {
@@ -99,18 +101,8 @@ export default function CatalogPage() {
 
   return (
     <main className="page">
-      <section className="surface sectionHeader">
-        <h1>Product Catalog</h1>
-        <p className="subtitle">Find a product, compare pack sizes, and add it to your cart.</p>
-      </section>
-
       <section className="controls surface">
-        <label>
-          Search
-          <input aria-label="Search products" value={searchText} onChange={(event) => setSearchText(event.target.value)} placeholder="Try rice, oil, sesame..." />
-        </label>
         <div className="inlineActions">
-          <button onClick={searchProducts} disabled={busyAction === "search"}>Search</button>
           <button className="ghost" onClick={() => void filterProducts("")} disabled={busyAction === "filter"}>Reset</button>
           <select aria-label="Sort products" value={sortBy} onChange={(event) => setSortBy(event.target.value)}>
             <option value="featured">Name: A-Z</option>
@@ -145,6 +137,15 @@ export default function CatalogPage() {
           <div className="grid">
             {visibleProducts.map((product) => (
               <article key={product.id} className="card surface">
+                {product.imageUrl ? (
+                  <Image
+                    className="productCardImage"
+                    src={product.imageUrl}
+                    alt={product.name}
+                    width={640}
+                    height={480}
+                  />
+                ) : null}
                 <h3>{product.name}</h3>
                 <p>{product.description || "A pantry staple, ready to explore."}</p>
                 <div className="meta">

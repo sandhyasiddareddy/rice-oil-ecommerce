@@ -49,12 +49,28 @@ public class ProductImageEntity {
         this.product = product;
     }
 
+    public Long getId() {
+        return id;
+    }
+
+    public String getImageUrl() {
+        return imageUrl;
+    }
+
     public void setImageUrl(String imageUrl) {
         this.imageUrl = imageUrl;
     }
 
     public void setAltText(String altText) {
         this.altText = altText;
+    }
+
+    public String getAltText() {
+        return altText;
+    }
+
+    public int getSortOrder() {
+        return sortOrder;
     }
 
     public void setSortOrder(int sortOrder) {

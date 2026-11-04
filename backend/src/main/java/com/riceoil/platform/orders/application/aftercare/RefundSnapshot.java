@@ -7,6 +7,8 @@ public record RefundSnapshot(
         Long orderId,
         BigDecimal amount,
         String status,
-        String reason
+        String reason,
+        String providerRefundId,
+        String providerStatus
 ) {
 }

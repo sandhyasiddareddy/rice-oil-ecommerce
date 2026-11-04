@@ -11,6 +11,8 @@ import com.riceoil.platform.orders.domain.OrderEntity;
 import com.riceoil.platform.orders.domain.OrderRepository;
 import com.riceoil.platform.orders.domain.OrderStatus;
 import com.riceoil.platform.promotions.application.PromotionRedemptionService;
+import com.riceoil.platform.shared.observability.BusinessLog;
+import com.riceoil.platform.shipping.application.ShippingFeeService;
 import com.riceoil.platform.shared.web.ResourceNotFoundException;
 import org.springframework.stereotype.Service;
 import org.springframework.security.access.AccessDeniedException;
@@ -33,12 +35,18 @@ public class OrderCheckoutService {
     private final OrderRepository orderRepository;
     private final PromotionRedemptionService promotionRedemptionService;
     private final ObjectMapper objectMapper;
+    private final OrderFulfilmentService orderFulfilmentService;
+    private final ShippingFeeService shippingFeeService;
 
     public OrderCheckoutService(CartRepository cartRepository,
                                 CartItemRepository cartItemRepository,
                                 OrderRepository orderRepository,
                                 PromotionRedemptionService promotionRedemptionService,
-                                ObjectMapper objectMapper) {
+                                ObjectMapper objectMapper,
+                                OrderFulfilmentService orderFulfilmentService,
+                                ShippingFeeService shippingFeeService) {
+        this.shippingFeeService = shippingFeeService;
+        this.orderFulfilmentService = orderFulfilmentService;
         this.cartRepository = cartRepository;
         this.cartItemRepository = cartItemRepository;
         this.orderRepository = orderRepository;
@@ -79,6 +87,8 @@ public class OrderCheckoutService {
                     throw new AccessDeniedException("Guest cart token is invalid");
                 }
             }
+            BusinessLog.info("ORDER_PLACE_REPLAYED", "orderNumber", existingOrder.getOrderNumber(),
+                    "orderId", existingOrder.getId(), "idempotencyKey", normalizedKey);
             return toSnapshot(existingOrder);
         }
 
@@ -110,10 +120,17 @@ public class OrderCheckoutService {
         order.setSubtotalAmount(cart.getSubtotalAmount());
         order.setTaxAmount(cart.getTaxAmount());
         order.setDiscountAmount(cart.getDiscountAmount());
-        order.setTotalAmount(cart.getTotalAmount());
+        BigDecimal shipping = shippingFeeService.feeFor(cart.getTotalAmount());
+        order.setShippingAmount(shipping);
+        order.setTotalAmount(cart.getTotalAmount().add(shipping));
         order.setCustomerEmail(normalizeEmail(command.customerEmail()));
+        order.setShippingAddressJson(writeAddress(command.shippingAddress()));
+        order.setBillingAddressJson(writeAddress(
+                command.billingAddress() == null ? command.shippingAddress() : command.billingAddress()
+        ));
 
         OrderEntity saved = orderRepository.save(order);
+        orderFulfilmentService.reserveStock(saved);
 
         cart.setStatus(CartStatus.CHECKED_OUT);
         cartRepository.save(cart);
@@ -124,6 +141,16 @@ public class OrderCheckoutService {
                 saved.getCustomerEmail(),
                 OffsetDateTime.now()
         );
+
+        BusinessLog.info("ORDER_PLACED", "orderNumber", saved.getOrderNumber(), "orderId", saved.getId(),
+                "cartId", cart.getId(), "currency", saved.getCurrency(), "subtotal", saved.getSubtotalAmount(),
+                "tax", saved.getTaxAmount(), "discount", saved.getDiscountAmount(), "total", saved.getTotalAmount(),
+                "coupons", cart.getCouponCodesJson(), "idempotencyKey", normalizedKey,
+                "customerType", authenticatedCustomerId == null ? "guest" : "registered");
+        for (var line : cartItemRepository.findByCartIdOrderByIdAsc(cart.getId())) {
+            BusinessLog.info("ORDER_ITEM", "orderNumber", saved.getOrderNumber(), "sku", line.getSku(),
+                    "quantity", line.getQuantity(), "unitPrice", line.getUnitPrice(), "lineTotal", line.getLineTotal());
+        }
 
         return toSnapshot(saved);
     }
@@ -162,6 +189,17 @@ public class OrderCheckoutService {
         return email.trim().toLowerCase(Locale.ROOT);
     }
 
+    private String writeAddress(OrderAddressSnapshot address) {
+        if (address == null) {
+            return null;
+        }
+        try {
+            return objectMapper.writeValueAsString(address);
+        } catch (Exception ex) {
+            throw new IllegalStateException("Unable to save order address snapshot", ex);
+        }
+    }
+
     private String generateOrderNumber() {
         String stamp = DateTimeFormatter.ofPattern("yyyyMMddHHmmss").format(OffsetDateTime.now());
         String random = Long.toUnsignedString(Double.doubleToLongBits(Math.random()), 36)
@@ -180,6 +218,7 @@ public class OrderCheckoutService {
                 order.getSubtotalAmount(),
                 order.getTaxAmount(),
                 order.getDiscountAmount(),
+                order.getShippingAmount(),
                 order.getTotalAmount(),
                 order.getCustomerEmail()
         );

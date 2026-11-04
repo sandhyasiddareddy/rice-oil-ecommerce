@@ -22,3 +22,5 @@ Thumbs.db
 # Env
 .env
 *.env.local
+backend/.env
+backend/src/main/resources/razorpay_test_api_keys_*.csv

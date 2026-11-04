@@ -16,7 +16,6 @@ import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.verify;
@@ -30,11 +29,19 @@ class PaymentOrderServiceTest {
     @Mock
     private GuestOrderAccessService guestOrderAccessService;
 
+    @Mock
+    private RazorpayGateway razorpayGateway;
+
     private PaymentOrderService paymentOrderService;
 
     @BeforeEach
     void setUp() {
-        this.paymentOrderService = new PaymentOrderService(orderRepository, guestOrderAccessService);
+        this.paymentOrderService = new PaymentOrderService(
+                orderRepository,
+                guestOrderAccessService,
+                razorpayGateway,
+                "rzp_test_public"
+        );
     }
 
     @Test
@@ -45,6 +52,8 @@ class PaymentOrderServiceTest {
         order.setCurrency("INR");
         order.setTotalAmount(new BigDecimal("190.00"));
         order.setStatus(OrderStatus.CREATED);
+        order.setOrderNumber("ORD-5");
+        when(razorpayGateway.createOrder(19000L, "INR", "ORD-5")).thenReturn("order_abc123");
 
         when(orderRepository.findById(5L)).thenReturn(Optional.of(order));
         when(orderRepository.save(any(OrderEntity.class))).thenAnswer(invocation -> invocation.getArgument(0));
@@ -52,9 +61,11 @@ class PaymentOrderServiceTest {
         RazorpayCreateOrderResult first = paymentOrderService.createRazorpayOrder(5L, 9L, null);
         RazorpayCreateOrderResult second = paymentOrderService.createRazorpayOrder(5L, 9L, null);
 
-        assertTrue(first.providerOrderId().startsWith("rpay_"));
+        assertEquals("order_abc123", first.providerOrderId());
         assertEquals(first.providerOrderId(), second.providerOrderId());
         assertEquals(OrderStatus.PAYMENT_PENDING, second.status());
+        assertEquals(19000L, first.amount());
+        assertEquals("rzp_test_public", first.keyId());
     }
 
     @Test
@@ -75,10 +86,13 @@ class PaymentOrderServiceTest {
         order.setCurrency("INR");
         order.setTotalAmount(new BigDecimal("190.00"));
         order.setStatus(OrderStatus.CREATED);
+        order.setOrderNumber("ORD-5");
+        when(razorpayGateway.createOrder(19000L, "INR", "ORD-5")).thenReturn("order_guest123");
         when(orderRepository.findById(5L)).thenReturn(Optional.of(order));
         when(orderRepository.save(any(OrderEntity.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(guestOrderAccessService.verifyAndGetOrder(5L, "guest-token"))
-                .thenReturn(new GuestOrderAccessSnapshot(5L, "ORD-5", OrderStatus.CREATED));
+                .thenReturn(new GuestOrderAccessSnapshot(5L, "ORD-5", OrderStatus.CREATED,
+                        "INR", new java.math.BigDecimal("190.00")));
 
         RazorpayCreateOrderResult result = paymentOrderService.createRazorpayOrder(5L, null, "guest-token");
 

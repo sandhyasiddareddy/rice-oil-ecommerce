@@ -29,7 +29,14 @@ public class CustomerOrdersController {
                         snapshot.status(),
                         snapshot.currency(),
                         snapshot.totalAmount(),
-                        snapshot.customerEmail()
+                        snapshot.shippingAmount(),
+                        snapshot.items(),
+                        snapshot.shipments(),
+                        snapshot.customerEmail(),
+                        snapshot.canRequestCancellation(),
+                        snapshot.cancellationStatus(),
+                        snapshot.refundStatus(),
+                        snapshot.refundAmount()
                 ))
                 .toList();
     }
@@ -44,7 +51,14 @@ public class CustomerOrdersController {
                 snapshot.status(),
                 snapshot.currency(),
                 snapshot.totalAmount(),
-                snapshot.customerEmail()
+                snapshot.shippingAmount(),
+                snapshot.items(),
+                snapshot.shipments(),
+                snapshot.customerEmail(),
+                snapshot.canRequestCancellation(),
+                snapshot.cancellationStatus(),
+                snapshot.refundStatus(),
+                snapshot.refundAmount()
         );
     }
 }

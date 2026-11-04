@@ -83,7 +83,16 @@ export default function CartPage() {
         readGuestCartAccessToken()
       );
       setCart(updated);
-      setStatusText("Cart totals updated.");
+      const discount = Number(updated.discountAmount);
+      if (couponCodes.length === 0) {
+        setStatusText("Coupon removed. Cart totals updated.");
+      } else if (discount > 0) {
+        setStatusText(`Coupon ${couponCodes.join(", ")} applied. You saved INR ${discount.toFixed(2)}.`);
+      } else {
+        setStatusText(
+          `Coupon ${couponCodes.join(", ")} could not be applied. It may be invalid, expired, or your cart doesn't meet its conditions (such as a minimum order value).`
+        );
+      }
     } catch (error) {
       setStatusText(normalizeError(error));
     } finally {
@@ -94,9 +103,7 @@ export default function CartPage() {
   return (
     <main className="page">
       <section className="pageHeading">
-        <p className="eyebrow">Your Cart</p>
-        <h1>Shopping cart</h1>
-        <p className="subtitle">Check quantities and totals before checkout.</p>
+        <h1>Cart</h1>
       </section>
 
       {statusText && !cart ? <p className="status" role="status">{statusText}</p> : null}

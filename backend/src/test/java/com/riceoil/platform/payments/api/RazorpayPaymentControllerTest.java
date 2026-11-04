@@ -40,8 +40,9 @@ class RazorpayPaymentControllerTest {
                 9L,
                 "rpay_abc123",
                 "INR",
-                new BigDecimal("190.00"),
-                OrderStatus.PAYMENT_PENDING
+                19000L,
+                OrderStatus.PAYMENT_PENDING,
+                "rzp_test_public"
         ));
 
         mockMvc.perform(post("/api/payments/razorpay/create-order")
@@ -50,7 +51,9 @@ class RazorpayPaymentControllerTest {
                         .header("X-Guest-Order-Token", "guest-token"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.orderId").value(9))
-                .andExpect(jsonPath("$.providerOrderId").value("rpay_abc123"));
+                .andExpect(jsonPath("$.providerOrderId").value("rpay_abc123"))
+                .andExpect(jsonPath("$.amount").value(19000))
+                .andExpect(jsonPath("$.keyId").value("rzp_test_public"));
     }
 
     @Test

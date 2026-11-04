@@ -29,11 +29,17 @@ public class JwtTokenService {
     }
 
     public String generateToken(CustomerAccountEntity customer) {
+        return generateToken(customer, java.util.UUID.randomUUID().toString());
+    }
+
+    /** The sessionId becomes the JWT id so every log line of one login session can be correlated. */
+    public String generateToken(CustomerAccountEntity customer, String sessionId) {
         try {
             Instant issuedAt = Instant.now();
             Instant expiration = issuedAt.plusSeconds(ttlMinutes * 60L);
             JWTClaimsSet claims = new JWTClaimsSet.Builder()
                     .issuer(issuer)
+                    .jwtID(sessionId)
                     .subject(customer.getEmail())
                     .claim("email", customer.getEmail())
                     .claim("customerId", customer.getId())

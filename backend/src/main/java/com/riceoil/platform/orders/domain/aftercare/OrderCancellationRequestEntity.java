@@ -29,6 +29,10 @@ public class OrderCancellationRequestEntity {
     @JoinColumn(name = "order_id", nullable = false)
     private OrderEntity order;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "refund_request_id")
+    private RefundRequestEntity refundRequest;
+
     @Column(length = 300)
     private String reason;
 
@@ -64,6 +68,14 @@ public class OrderCancellationRequestEntity {
 
     public void setOrder(OrderEntity order) {
         this.order = order;
+    }
+
+    public RefundRequestEntity getRefundRequest() {
+        return refundRequest;
+    }
+
+    public void setRefundRequest(RefundRequestEntity refundRequest) {
+        this.refundRequest = refundRequest;
     }
 
     public String getReason() {

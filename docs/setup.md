@@ -1,102 +1,112 @@
 # Farmora Local Setup Guide
 
-This guide helps you run the project on a new machine with either Docker PostgreSQL or an H2 fallback.
+This guide covers Windows PowerShell startup with Docker/PostgreSQL or the H2 fallback.
 
-## 1. Prerequisites
-- Git
+## Prerequisites
+
 - Java 21
-- Node.js 22+
-- npm
-- Docker Desktop (optional, for PostgreSQL mode)
+- Node.js 22 or newer and npm
+- Docker Desktop only for PostgreSQL mode
 
-If you do not want global installs, this repository includes portable runtimes in .tools.
+Check the installed tools from PowerShell:
 
-## 2. Clone and install dependencies
-1. Clone the repository.
-2. Open terminal at repository root.
-3. Install frontend dependencies:
-   - cd frontend
-   - npm install
+```powershell
+java -version
+node --version
+npm --version
+```
 
-## 3. Run with PostgreSQL (recommended)
-1. Start DB from repository root:
-   - docker compose up -d
-2. Start backend:
-   - cd backend
-   - ./mvnw spring-boot:run
-3. Start frontend:
-   - cd frontend
-   - npm run dev
-4. Open:
-   - Frontend: http://localhost:3000
-   - Backend health: http://localhost:8080/actuator/health
+If the repository's `.tools` folder is available, add its Java and Node `bin` folders to `PATH` for the current terminal before continuing.
 
-## 4. Run without Docker (H2 fallback)
-Use this if Docker is unavailable.
+## One-time frontend install
 
-1. Start backend with H2 on test classpath:
-   - cd backend
-   - SPRING_DATASOURCE_URL=jdbc:h2:mem:platform;MODE=PostgreSQL;DB_CLOSE_DELAY=-1
-   - SPRING_DATASOURCE_DRIVER_CLASS_NAME=org.h2.Driver
-   - SPRING_DATASOURCE_USERNAME=sa
-   - SPRING_DATASOURCE_PASSWORD=
-   - SPRING_JPA_HIBERNATE_DDL_AUTO=create-drop
-   - SPRING_FLYWAY_ENABLED=false
-   - ./mvnw spring-boot:test-run
+Run from the repository root:
 
-On PowerShell (single line):
-- $env:SPRING_DATASOURCE_URL='jdbc:h2:mem:platform;MODE=PostgreSQL;DB_CLOSE_DELAY=-1'; $env:SPRING_DATASOURCE_DRIVER_CLASS_NAME='org.h2.Driver'; $env:SPRING_DATASOURCE_USERNAME='sa'; $env:SPRING_DATASOURCE_PASSWORD=''; $env:SPRING_JPA_HIBERNATE_DDL_AUTO='create-drop'; $env:SPRING_FLYWAY_ENABLED='false'; ./mvnw.cmd spring-boot:test-run
+```powershell
+cd frontend
+npm.cmd install
+```
 
-2. Start frontend:
-   - cd frontend
-   - npm run dev
+## Start with PostgreSQL
 
-## 5. Portable toolchain mode (if java/npm are not on PATH)
-From repository root:
+Use two PowerShell terminals. In terminal 1, start PostgreSQL from the repository root:
 
-Frontend:
-- Windows PowerShell:
-  - $env:Path='C:\Users\<you>\rice-oil-ecommerce\.tools\node-v22.13.1-win-x64;' + $env:Path
-  - cd frontend
-  - npm.cmd run dev
+```powershell
+docker compose up -d
+```
 
-Backend:
-- Windows PowerShell:
-  - $env:JAVA_HOME='C:\Users\<you>\rice-oil-ecommerce\.tools\jdk-21.0.13+9'
-  - $env:Path="$env:JAVA_HOME\bin;$env:Path"
-  - cd backend
-  - ./mvnw.cmd --batch-mode test
+Check `backend/.env` before starting the backend. Spring loads that file when its working directory is `backend`; any `DB_URL`, `DB_USERNAME`, or `DB_PASSWORD` values there override the Docker defaults. Then run:
 
-## 6. Verification checks
-- Frontend build:
-  - cd frontend
-  - npm run build
-- Backend tests:
-  - cd backend
-  - ./mvnw --batch-mode test
+```powershell
+cd backend
+.\mvnw.cmd spring-boot:run
+```
 
-## 7. Troubleshooting
-### UI opens but shows 404/500 or missing style/script chunks
-Cause: stale or corrupted Next.js cache.
+In terminal 2, start the storefront:
 
-Fix:
-1. Stop dev server.
-2. Remove cache files in frontend:
-   - .next directory
-   - tsconfig.tsbuildinfo
-3. Restart dev server:
-   - npm run dev
+```powershell
+cd frontend
+npm.cmd run dev
+```
 
-### Port 3000 already in use
-- Stop old Node process, then restart frontend dev server.
+Open the frontend URL printed by Next.js (normally `http://localhost:3000`). Backend health is at `http://localhost:8080/actuator/health`.
 
-### npm or java not recognized
-- Use portable toolchain commands from section 5.
+To seed sample rice products and stock in a local database, set `SAMPLE_DATA_ENABLED=true` in `backend/.env` and restart the backend. The seed is disabled by default; do not enable it in production.
 
-## 8. Key routes
-- Home: http://localhost:3000/
-- Catalog: http://localhost:3000/catalog
-- Cart: http://localhost:3000/cart
-- Orders: http://localhost:3000/orders
-- Login: http://localhost:3000/login
-- Admin: http://localhost:3000/admin
+## Start without Docker (H2)
+
+H2 is test-scoped, so use Spring Boot's `test-run` goal. This command skips compiling repository test sources while retaining the H2 test classpath. Run from `backend` in terminal 1:
+
+```powershell
+$env:SPRING_DATASOURCE_URL = 'jdbc:h2:mem:platform;MODE=PostgreSQL;DB_CLOSE_DELAY=-1'
+$env:SPRING_DATASOURCE_DRIVER_CLASS_NAME = 'org.h2.Driver'
+$env:SPRING_DATASOURCE_USERNAME = 'sa'
+$env:SPRING_DATASOURCE_PASSWORD = ''
+$env:SPRING_JPA_HIBERNATE_DDL_AUTO = 'create-drop'
+$env:SPRING_FLYWAY_ENABLED = 'false'
+.\mvnw.cmd -Dmaven.test.skip=true spring-boot:test-run
+```
+
+In terminal 2, start the frontend as above. H2 is in memory; restarting the backend clears accounts, carts, catalog data, and orders.
+
+## Stop the app
+
+Press `Ctrl+C` in both terminals. If using Docker, stop PostgreSQL from the repository root:
+
+```powershell
+docker compose down
+```
+
+## Troubleshooting
+
+### Port 3000 is already in use
+
+Next.js automatically tries another port, usually 3001. Use the URL printed in the frontend terminal. The default CORS configuration allows both `localhost:3000` and `localhost:3001`.
+
+### Admin portal
+
+Open `/admin` on the active frontend origin. Staff credentials are configured by `APP_ADMIN_USERNAME` and `APP_ADMIN_PASSWORD` in `backend/.env`. The code defaults (`admin` / `change-me-admin-password`) are for local development only; replace them before sharing or deploying. Customer accounts do not grant staff access.
+
+### The UI shows stale pages or missing chunks
+
+Stop the frontend, then remove the Next.js cache and restart it:
+
+```powershell
+Remove-Item -Recurse -Force frontend\.next
+cd frontend
+npm.cmd run dev
+```
+
+### Backend tests fail to compile
+
+The H2 startup command above uses `-Dmaven.test.skip=true` to bypass test-source compilation. Run `mvnw.cmd test` separately when working on tests; do not ignore test failures in CI.
+
+## Useful routes
+
+- Home: `http://localhost:3000/`
+- Catalog: `http://localhost:3000/catalog`
+- Cart: `http://localhost:3000/cart`
+- Orders: `http://localhost:3000/orders`
+- Account: `http://localhost:3000/login`
+- Staff portal: `http://localhost:3000/admin`
+- Backend health: `http://localhost:8080/actuator/health`

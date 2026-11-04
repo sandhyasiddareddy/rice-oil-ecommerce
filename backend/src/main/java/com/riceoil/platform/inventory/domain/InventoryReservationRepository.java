@@ -7,4 +7,6 @@ import java.util.List;
 
 public interface InventoryReservationRepository extends JpaRepository<InventoryReservationEntity, Long> {
     List<InventoryReservationEntity> findByStatusAndExpiresAtBefore(String status, OffsetDateTime expiresAt);
+
+    List<InventoryReservationEntity> findByReservationKeyStartingWithAndStatus(String keyPrefix, String status);
 }

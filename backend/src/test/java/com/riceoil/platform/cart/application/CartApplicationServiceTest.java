@@ -49,6 +49,22 @@ class CartApplicationServiceTest {
                 checkoutQuoteService,
                 new ObjectMapper()
         );
+        org.mockito.Mockito.lenient().when(checkoutQuoteService.quote(any(CheckoutQuoteRequest.class)))
+                .thenAnswer(invocation -> {
+                    CheckoutQuoteRequest request = invocation.getArgument(0);
+                    BigDecimal subtotal = request.subtotal().setScale(2);
+                    return new CheckoutQuoteResult(
+                            subtotal,
+                            new BigDecimal("0.00"),
+                            subtotal,
+                            request.taxCode(),
+                            false,
+                            null,
+                            new BigDecimal("0.00"),
+                            subtotal,
+                            List.of()
+                    );
+                });
     }
 
     @Test
@@ -95,7 +111,7 @@ class CartApplicationServiceTest {
 
         when(cartRepository.findById(5L)).thenReturn(Optional.of(cart));
         when(cartItemRepository.save(any(CartItemEntity.class))).thenReturn(savedItem);
-        when(cartItemRepository.findByCartIdOrderByIdAsc(5L)).thenReturn(List.of(savedItem));
+        when(cartItemRepository.findByCartIdOrderByIdAsc(5L)).thenReturn(List.of(), List.of(savedItem));
 
         CartSnapshot snapshot = cartApplicationService.addItem(
                 5L,
@@ -105,6 +121,45 @@ class CartApplicationServiceTest {
         );
 
         assertEquals(1, snapshot.items().size());
+        assertEquals(new BigDecimal("200.00"), snapshot.items().get(0).lineTotal());
+        assertEquals(new BigDecimal("200.00"), snapshot.subtotalAmount());
+        assertEquals(new BigDecimal("200.00"), snapshot.totalAmount());
+    }
+
+    @Test
+    void addItem_shouldMergeQuantityWhenSkuAlreadyInCart() throws Exception {
+        CartEntity cart = new CartEntity();
+        setPrivateId(cart, 5L);
+        cart.setStatus(CartStatus.ACTIVE);
+        cart.setCurrency("INR");
+        cart.setGuestAccessTokenHash(GuestCartAccessToken.hash(GUEST_CART_TOKEN));
+        cart.setSubtotalAmount(new BigDecimal("0.00"));
+        cart.setTaxAmount(new BigDecimal("0.00"));
+        cart.setDiscountAmount(new BigDecimal("0.00"));
+        cart.setTotalAmount(new BigDecimal("0.00"));
+
+        CartItemEntity existing = new CartItemEntity();
+        setPrivateId(existing, 10L);
+        existing.setCart(cart);
+        existing.setSku("RICE-5KG");
+        existing.setProductName("Rice");
+        existing.setUnitPrice(new BigDecimal("100.00"));
+        existing.setQuantity(1);
+        existing.setLineTotal(new BigDecimal("100.00"));
+
+        when(cartRepository.findById(5L)).thenReturn(Optional.of(cart));
+        when(cartItemRepository.save(any(CartItemEntity.class))).thenReturn(existing);
+        when(cartItemRepository.findByCartIdOrderByIdAsc(5L)).thenReturn(List.of(existing));
+
+        CartSnapshot snapshot = cartApplicationService.addItem(
+                5L,
+                new AddCartItemCommand("rice-5kg", "Rice", new BigDecimal("100"), 1),
+                null,
+                GUEST_CART_TOKEN
+        );
+
+        assertEquals(1, snapshot.items().size());
+        assertEquals(2, snapshot.items().get(0).quantity());
         assertEquals(new BigDecimal("200.00"), snapshot.items().get(0).lineTotal());
     }
 
@@ -192,6 +247,8 @@ class CartApplicationServiceTest {
         );
 
         assertEquals(new BigDecimal("360.00"), snapshot.items().get(0).lineTotal());
+        assertEquals(new BigDecimal("360.00"), snapshot.subtotalAmount());
+        assertEquals(new BigDecimal("360.00"), snapshot.totalAmount());
     }
 
     @Test
@@ -207,6 +264,20 @@ class CartApplicationServiceTest {
 
         verify(cartItemRepository).delete(item);
         assertEquals(0, snapshot.items().size());
+        assertEquals(new BigDecimal("0.00"), snapshot.totalAmount());
+    }
+
+    @Test
+    void getCart_shouldRepairStaleSummaryAmounts() throws Exception {
+        CartEntity cart = cart(5L);
+        CartItemEntity item = item(10L, cart, new BigDecimal("119.00"), 1);
+        when(cartRepository.findById(5L)).thenReturn(Optional.of(cart));
+        when(cartItemRepository.findByCartIdOrderByIdAsc(5L)).thenReturn(List.of(item));
+
+        CartSnapshot snapshot = cartApplicationService.getCart(5L, null, GUEST_CART_TOKEN);
+
+        assertEquals(new BigDecimal("119.00"), snapshot.subtotalAmount());
+        assertEquals(new BigDecimal("119.00"), snapshot.totalAmount());
     }
 
     @Test

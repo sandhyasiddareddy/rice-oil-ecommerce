@@ -45,6 +45,12 @@ class OrderCheckoutServiceTest {
     @Mock
     private PromotionRedemptionService promotionRedemptionService;
 
+    @Mock
+    private OrderFulfilmentService orderFulfilmentService;
+
+    @Mock
+    private com.riceoil.platform.shipping.application.ShippingFeeService shippingFeeService;
+
     private OrderCheckoutService orderCheckoutService;
 
     @BeforeEach
@@ -54,8 +60,11 @@ class OrderCheckoutServiceTest {
                 cartItemRepository,
                 orderRepository,
                 promotionRedemptionService,
-                new ObjectMapper()
+                new ObjectMapper(),
+                orderFulfilmentService,
+                shippingFeeService
         );
+        org.mockito.Mockito.lenient().when(shippingFeeService.feeFor(any())).thenReturn(new BigDecimal("40.00"));
     }
 
     @Test
@@ -82,12 +91,31 @@ class OrderCheckoutServiceTest {
 
         OrderSnapshot result = orderCheckoutService.placeOrder(
                 "idem-1",
-                new PlaceOrderCommand(10L, "Buyer@Example.com"),
+                new PlaceOrderCommand(
+                        10L,
+                        "Buyer@Example.com",
+                        new OrderAddressSnapshot(
+                                "Buyer", "9876543210", "1 Main Street", null,
+                                "Chennai", "Tamil Nadu", "600001", "IN"
+                        ),
+                        null
+                ),
                 null,
                 GUEST_CART_TOKEN
         );
 
+        ArgumentCaptor<OrderEntity> orderCaptor = ArgumentCaptor.forClass(OrderEntity.class);
+        verify(orderRepository).save(orderCaptor.capture());
+        assertEquals(
+                "{\"fullName\":\"Buyer\",\"phone\":\"9876543210\",\"line1\":\"1 Main Street\","
+                        + "\"line2\":null,\"city\":\"Chennai\",\"state\":\"Tamil Nadu\","
+                        + "\"postalCode\":\"600001\",\"country\":\"IN\"}",
+                orderCaptor.getValue().getShippingAddressJson()
+        );
+        assertEquals(orderCaptor.getValue().getShippingAddressJson(), orderCaptor.getValue().getBillingAddressJson());
         assertEquals(77L, result.id());
+        assertEquals(new BigDecimal("40.00"), result.shippingAmount());
+        assertEquals(new BigDecimal("230.00"), result.totalAmount());
         assertEquals(10L, result.cartId());
         assertEquals(OrderStatus.CREATED, result.status());
         assertEquals("buyer@example.com", result.customerEmail());

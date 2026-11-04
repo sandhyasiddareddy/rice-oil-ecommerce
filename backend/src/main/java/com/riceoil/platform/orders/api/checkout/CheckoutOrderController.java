@@ -33,7 +33,12 @@ public class CheckoutOrderController {
             @Valid @RequestBody CheckoutOrderHttpRequest request,
             @AuthenticationPrincipal Jwt jwt) {
         String customerEmail = jwt == null ? request.customerEmail() : jwt.getSubject();
-        PlaceOrderCommand command = new PlaceOrderCommand(request.cartId(), customerEmail);
+        PlaceOrderCommand command = new PlaceOrderCommand(
+                request.cartId(),
+                customerEmail,
+                request.shippingAddress().toSnapshot(),
+                request.billingAddress() == null ? null : request.billingAddress().toSnapshot()
+        );
         OrderSnapshot order = orderCheckoutService.placeOrder(
                 idempotencyKey,
                 command,

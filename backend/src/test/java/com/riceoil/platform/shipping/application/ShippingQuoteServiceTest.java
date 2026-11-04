@@ -32,7 +32,8 @@ class ShippingQuoteServiceTest {
         ShippingQuoteService service = new ShippingQuoteService(
                 cartRepository,
                 cartApplicationService,
-                quoteRepository
+                quoteRepository,
+                org.mockito.Mockito.mock(ShippingFeeService.class)
         );
 
         org.mockito.Mockito.doThrow(new AccessDeniedException("Denied"))
@@ -53,7 +54,8 @@ class ShippingQuoteServiceTest {
         ShippingQuoteService service = new ShippingQuoteService(
                 cartRepository,
                 cartApplicationService,
-                quoteRepository
+                quoteRepository,
+                org.mockito.Mockito.mock(ShippingFeeService.class)
         );
 
         org.mockito.Mockito.doThrow(new AccessDeniedException("Denied"))

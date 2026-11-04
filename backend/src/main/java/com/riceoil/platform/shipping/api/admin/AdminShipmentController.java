@@ -1,5 +1,6 @@
 package com.riceoil.platform.shipping.api.admin;
 
+import com.riceoil.platform.shipping.application.AdminShipmentUpdateService;
 import com.riceoil.platform.shipping.application.ShipmentSnapshot;
 import com.riceoil.platform.shipping.application.ShipmentTrackingService;
 import com.riceoil.platform.shipping.domain.ShipmentStatus;
@@ -20,9 +21,33 @@ import java.time.OffsetDateTime;
 public class AdminShipmentController {
 
     private final ShipmentTrackingService shipmentTrackingService;
+    private final AdminShipmentUpdateService adminShipmentUpdateService;
 
-    public AdminShipmentController(ShipmentTrackingService shipmentTrackingService) {
+    public AdminShipmentController(ShipmentTrackingService shipmentTrackingService,
+                                   AdminShipmentUpdateService adminShipmentUpdateService) {
         this.shipmentTrackingService = shipmentTrackingService;
+        this.adminShipmentUpdateService = adminShipmentUpdateService;
+    }
+
+    @org.springframework.web.bind.annotation.GetMapping("/orders")
+    public java.util.List<AdminShipmentUpdateService.FulfilmentOrder> paidOrders() {
+        return adminShipmentUpdateService.listPaidOrders();
+    }
+
+    @PostMapping("/update")
+    public ShipmentSnapshot updateByOrderNumber(@Valid @RequestBody ManualShipmentUpdateRequest request) {
+        return adminShipmentUpdateService.update(request.orderNumber(), request.provider(),
+                request.trackingNumber(), request.trackingUrl(), request.status(), request.note());
+    }
+
+    public record ManualShipmentUpdateRequest(
+            @NotBlank String orderNumber,
+            String provider,
+            String trackingNumber,
+            String trackingUrl,
+            @NotNull ShipmentStatus status,
+            String note
+    ) {
     }
 
     @PostMapping

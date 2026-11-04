@@ -13,12 +13,15 @@ This repository contains phased implementation of a modular e-commerce platform 
 	- Tax rule and promotion persistence schema.
 	- Pricing quote service and coupon validation with redemption constraints.
 	- Checkout order placement with idempotency support.
-	- Payment create-order, verify, and webhook ingestion scaffolding.
+	- Razorpay provider order creation, Checkout handoff, payment verification, and webhook validation. External sandbox validation is still required.
 	- Shipping quote and guest order access scaffolding.
 	- Cancellation/refund request scaffolding.
 - Storefront UI currently includes:
-	- Home catalog, full catalog listing, product detail, cart, orders, login, and admin shell routes.
+	- Home catalog, full catalog listing, product detail, cart, orders, login, address book, account recovery, and admin shell routes.
 	- Organic-themed styling and customer-focused messaging.
+- Customer accounts now include customer-owned carts/orders, an address book, checkout address snapshots, and expiring single-use password reset links.
+- Razorpay checkout is wired for server-created provider orders and server-side payment verification. Sandbox checkout still requires account credentials and webhook configuration.
+- Guest shipment tracking displays recorded events; those events are currently updated by the admin API until a carrier integration is configured.
 
 ## Repository layout
 - backend: Spring Boot modular monolith foundation (Java 21, Flyway, Actuator, Security baseline).
@@ -31,18 +34,9 @@ This repository contains phased implementation of a modular e-commerce platform 
 - Docker Desktop (optional, for local PostgreSQL)
 
 ## Quick start
-Use docs/setup.md for full machine setup, including Docker and H2 fallback modes.
+For Windows PowerShell, Docker/H2 options, environment setup, and copy-paste commands, see [docs/setup.md](docs/setup.md).
 
-Basic flow:
-1. Start database (optional if using Docker mode):
-	- docker compose up -d
-2. Start backend:
-	- cd backend
-	- ./mvnw spring-boot:run
-3. Start frontend:
-	- cd frontend
-	- npm install
-	- npm run dev
+In brief, install frontend dependencies once with `cd frontend; npm.cmd install`. Then use separate terminals to run the backend from `backend` and the frontend from `frontend`. If Docker is unavailable, the setup guide includes the H2 startup command and required environment variables.
 
 ## Build and test
 1. Backend:
@@ -53,6 +47,18 @@ Basic flow:
 	- npm run lint
 	- npm run typecheck
 	- npm run build
+
+## External service configuration
+
+Configure these values through environment variables or a managed secret store; do not commit provider credentials:
+
+- `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET`, and `RAZORPAY_WEBHOOK_SECRET` for Razorpay sandbox checkout. `RAZORPAY_BASE_URL` defaults to `https://api.razorpay.com/v1`.
+- For local backend development, `backend/.env` is loaded when starting Spring Boot from the `backend` directory. Keep the webhook secret blank until you configure one in Razorpay Test Mode.
+- Set `SAMPLE_DATA_ENABLED=true` in the local `backend/.env` to seed sample rice products, pack sizes, stock, and illustrations on backend startup. This is disabled by default and should remain disabled in production.
+- `MAIL_HOST`, `MAIL_PORT`, `MAIL_USERNAME`, `MAIL_PASSWORD`, and `MAIL_FROM` for password-reset email delivery. `MAIL_SMTP_AUTH` and `MAIL_SMTP_STARTTLS` default to `true`.
+- `APP_FRONTEND_BASE_URL` sets the origin used in password-reset links and defaults to `http://localhost:3000`.
+
+Provider accounts and sandbox credentials must be created by the account owner. A successful local test run does not validate connectivity to Razorpay or SMTP.
 
 ## Notes
 - Policy-sensitive behaviors (tax, cancellation, returns, refund timelines, shipping policy) must remain configuration-driven and not hard-coded.

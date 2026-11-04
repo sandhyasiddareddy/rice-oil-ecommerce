@@ -2,9 +2,15 @@ package com.riceoil.platform.customers.application;
 
 import com.riceoil.platform.orders.domain.OrderEntity;
 import com.riceoil.platform.orders.domain.OrderRepository;
+import com.riceoil.platform.orders.domain.OrderStatus;
 import com.riceoil.platform.customers.domain.CustomerAccountEntity;
 import com.riceoil.platform.customers.domain.CustomerAccountRepository;
 import com.riceoil.platform.shared.web.ResourceNotFoundException;
+import com.riceoil.platform.orders.application.aftercare.AftercareService;
+import com.riceoil.platform.orders.application.aftercare.AftercareSummary;
+import com.riceoil.platform.orders.application.OrderItemsQueryService;
+import com.riceoil.platform.orders.application.OrderLinesSnapshot;
+import com.riceoil.platform.shipping.application.ShipmentTrackingService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -16,11 +22,20 @@ public class CustomerOrderQueryService {
 
     private final OrderRepository orderRepository;
     private final CustomerAccountRepository customerAccountRepository;
+    private final AftercareService aftercareService;
+    private final OrderItemsQueryService orderItemsQueryService;
+    private final ShipmentTrackingService shipmentTrackingService;
 
     public CustomerOrderQueryService(OrderRepository orderRepository,
-                                     CustomerAccountRepository customerAccountRepository) {
+                                     CustomerAccountRepository customerAccountRepository,
+                                     AftercareService aftercareService,
+                                     OrderItemsQueryService orderItemsQueryService,
+                                     ShipmentTrackingService shipmentTrackingService) {
         this.orderRepository = orderRepository;
         this.customerAccountRepository = customerAccountRepository;
+        this.aftercareService = aftercareService;
+        this.orderItemsQueryService = orderItemsQueryService;
+        this.shipmentTrackingService = shipmentTrackingService;
     }
 
     @Transactional(readOnly = true)
@@ -57,13 +72,22 @@ public class CustomerOrderQueryService {
     }
 
     private CustomerOrderSnapshot toSnapshot(OrderEntity entity) {
+        AftercareSummary aftercare = aftercareService.summary(entity.getId());
+        OrderLinesSnapshot lines = orderItemsQueryService.linesFor(entity.getId());
         return new CustomerOrderSnapshot(
                 entity.getId(),
                 entity.getOrderNumber(),
                 entity.getStatus().name(),
                 entity.getCurrency(),
                 entity.getTotalAmount(),
-                entity.getCustomerEmail()
+                lines.shippingAmount(),
+                lines.items(),
+                shipmentTrackingService.getOrderShipments(entity.getId()),
+                entity.getCustomerEmail(),
+                aftercare.canRequestCancellation(),
+                aftercare.cancellationStatus(),
+                aftercare.refundStatus(),
+                aftercare.refundAmount()
         );
     }
 }

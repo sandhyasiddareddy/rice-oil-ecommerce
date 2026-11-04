@@ -26,6 +26,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @SpringBootTest(properties = {
+    "app.catalog.sample-data.enabled=false",
     "spring.flyway.enabled=false",
     "spring.datasource.url=jdbc:h2:mem:platform-orders-it;MODE=PostgreSQL;DB_CLOSE_DELAY=-1",
     "spring.datasource.driver-class-name=org.h2.Driver",
@@ -83,7 +84,10 @@ class CheckoutOrderIdempotencyIntegrationTest {
                         .header("Idempotency-Key", idempotencyKey)
                         .header("X-Guest-Cart-Token", GUEST_CART_TOKEN)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"cartId\":" + cartId + ",\"customerEmail\":\"Buyer@Example.com\"}"))
+                        .content("{\"cartId\":" + cartId + ",\"customerEmail\":\"Buyer@Example.com\","
+                                + "\"shippingAddress\":{\"fullName\":\"Buyer\",\"phone\":\"9876543210\","
+                                + "\"line1\":\"1 Main Street\",\"city\":\"Chennai\",\"state\":\"Tamil Nadu\","
+                                + "\"postalCode\":\"600001\",\"country\":\"IN\"}}"))
                 .andExpect(status().isOk())
                 .andReturn();
     }

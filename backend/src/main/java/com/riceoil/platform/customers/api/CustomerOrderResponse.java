@@ -1,6 +1,10 @@
 package com.riceoil.platform.customers.api;
 
+import com.riceoil.platform.orders.application.OrderItemSnapshot;
+import com.riceoil.platform.shipping.application.ShipmentSnapshot;
+
 import java.math.BigDecimal;
+import java.util.List;
 
 public record CustomerOrderResponse(
         Long id,
@@ -8,6 +12,13 @@ public record CustomerOrderResponse(
         String status,
         String currency,
         BigDecimal totalAmount,
-        String customerEmail
+        BigDecimal shippingAmount,
+        List<OrderItemSnapshot> items,
+        List<ShipmentSnapshot> shipments,
+        String customerEmail,
+        boolean canRequestCancellation,
+        String cancellationStatus,
+        String refundStatus,
+        BigDecimal refundAmount
 ) {
 }
